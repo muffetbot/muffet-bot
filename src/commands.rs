@@ -12,7 +12,7 @@ use simple_announcements::*;
 use serenity::framework::standard::macros::group;
 
 #[group]
-#[commands(contact, donate, goals, minecraft, pobox, poetry, stream)]
+#[commands(about, donate, goal, goals, minecraft, pobox, shop, stream)]
 struct MuffetBot;
 
 mod socials;

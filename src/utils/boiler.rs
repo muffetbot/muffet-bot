@@ -7,11 +7,11 @@ use serenity::{
         macros::{help, hook},
         Args, CommandGroup, CommandResult, HelpOptions,
     },
-    model::{channel::Message, gateway::Ready, id::UserId},
+    model::{channel::Message, id::UserId},
     prelude::*,
 };
 
-pub struct ShardManagerContainer {}
+pub struct ShardManagerContainer;
 
 use std::{collections::HashSet, sync::Arc};
 use tokio::sync::Mutex;
@@ -20,7 +20,7 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
-pub struct Handler {}
+pub struct Handler;
 
 impl Handler {
     pub fn new() -> Self {
@@ -30,10 +30,6 @@ impl Handler {
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _ctx: Context, ready: Ready) {
-        println!("{} entered the channel", ready.user.name);
-    }
-
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "!help" {
             if let Err(e) = msg.channel_id.say(&ctx.http, "hi!").await {

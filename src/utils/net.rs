@@ -11,38 +11,33 @@ use std::collections::HashMap;
 static URLS: Lazy<HashMap<Links, &str>> = Lazy::new(|| {
     let mut link_urls = HashMap::new();
     use Links::*;
-    link_urls.insert(Contact, "https://www.steelcutkawaii.com/contact");
+    link_urls.insert(About, "https://www.steelcutkawaii.com/about");
     link_urls.insert(Donate, "https://secure.squarespace.com/checkout/donate?donatePageId=5f25897026a28453d038f64a&ss_cvr=6f6f279b-f7c6-4278-9d23-c2c8ceebd537%7C1603010061453%7C1603010061453%7C1603010061453%7C1");
     link_urls.insert(Email, "mailto: xxspidderxx@gmail.com");
     link_urls.insert(Goals, "https://www.steelcutkawaii.com/goals");
     link_urls.insert(Patreon, "https://www.patreon.com/LittleMissClub");
-    link_urls.insert(Poetry, "https://www.steelcutkawaii.com/shop-1/zines");
+    link_urls.insert(Shop, "https://www.steelcutkawaii.com/shop");
     link_urls.insert(Stream, "https://www.chaturbate.com/xx_spidder_xx");
     link_urls.insert(Twitter, "https://twitter.com/LittleMissMuf18");
     link_urls.insert(Venmo, "https://venmo.com/LilMissMuffet");
-    link_urls.insert(
-        YouTube,
-        "https://www.youtube.com/channel/UCz6dg88uZ0nHib3gjCAUw-w",
-    );
+    link_urls.insert(YouTube, "https://www.youtube.com/c/XxSpidderxX");
 
     link_urls
 });
 
-#[derive(Hash, PartialEq)]
+#[derive(Hash, PartialEq, Eq)]
 pub enum Links {
-    Contact,
+    About,
     Donate,
     Email,
     Goals,
     Patreon,
-    Poetry,
+    Shop,
     Stream,
     Twitter,
     YouTube,
     Venmo,
 }
-
-impl Eq for Links {}
 
 impl AsRef<str> for Links {
     fn as_ref<'a>(&'a self) -> &'a str {
@@ -55,15 +50,28 @@ impl Links {
     /// this method is used by the scraper.
     /// see https://docs.rs/easy-scraper/0.2.0/easy_scraper/ for documentation
     pub fn pattern<'a>(&'a self) -> &'a str {
+        use Links::*;
         match self {
-            Links::Contact => {
-                r#"<div id="block-77e2f05ca8cd8a53543b"><div class="sqs-block-content"><h3>{{title}}</h3><p>{{meat}}</p></div></div>"#
+            About => {
+                r#"
+            <div data-block-type="2">
+            <p>{{about1}}</p>
+            <p>{{about2}}
+            </div>
+                "#
             }
-            Links::Goals => {
+            Goals => {
                 r#"
 		    <li>
-			    <p>{{entry}}</p>
+			    <p>{{goal}}</p>
 		    </li>"#
+            }
+            Shop => {
+                r#"
+            <div data-controller="ProductListImageLoader">
+		    <a href="{{shop_url}}" aria-label="{{item_name}}"></a>
+	        </div>
+                "#
             }
             _ => "",
         }
