@@ -12,8 +12,8 @@ static URLS: Lazy<HashMap<Links, &str>> = Lazy::new(|| {
     let mut link_urls = HashMap::new();
     use Links::*;
     link_urls.insert(About, "https://www.steelcutkawaii.com/about");
-    link_urls.insert(Donate, "https://secure.squarespace.com/checkout/donate?donatePageId=5f25897026a28453d038f64a&ss_cvr=6f6f279b-f7c6-4278-9d23-c2c8ceebd537%7C1603010061453%7C1603010061453%7C1603010061453%7C1");
-    link_urls.insert(Email, "mailto: xxspidderxx@gmail.com");
+    link_urls.insert(Donate, "https://www.steelcutkawaii.com/donate");
+    link_urls.insert(Email, "xxspidderxx@gmail.com");
     link_urls.insert(Goals, "https://www.steelcutkawaii.com/goals");
     link_urls.insert(Patreon, "https://www.patreon.com/LittleMissClub");
     link_urls.insert(Shop, "https://www.steelcutkawaii.com/shop");
