@@ -9,6 +9,8 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.35"
 easy-scraper = "0.2.0"
+flexi_logger = "0.16"
+log = "0.4"
 once_cell = "1.5.2"
 rand = "0.7.3"
 reqwest = "0.10.9"

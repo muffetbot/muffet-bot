@@ -1,6 +1,5 @@
 /// SEE https://github.com/serenity-rs/serenity/blob/current/examples/e05_command_framework/src/main.rs for example
 use serenity::{
-    async_trait,
     client::bridge::gateway::ShardManager,
     framework::standard::{
         help_commands,
@@ -20,29 +19,11 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
-pub struct Handler;
-
-impl Handler {
-    pub fn new() -> Self {
-        Handler {}
-    }
-}
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!help" {
-            if let Err(e) = msg.channel_id.say(&ctx.http, "hi!").await {
-                eprintln!("{}", e);
-            }
-        }
-    }
-}
+use crate::prelude::announce;
 
 #[help]
 #[command_not_found_text = "`{}` is not a command!"]
-#[individual_command_tip = "To get more info on a command, pass it as an argument.
-i.e. `!help goals`"]
+#[individual_command_tip = ""]
 #[strikethrough_commands_tip_in_dm = ""]
 #[strikethrough_commands_tip_in_guild = ""]
 pub async fn muffet_help(
@@ -53,13 +34,16 @@ pub async fn muffet_help(
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
+    if let Err(e) = announce(context, msg, "Hi!").await {
+        eprintln!("{}", e);
+    }
     let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
     Ok(())
 }
 
 #[hook]
 pub async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
-    if let Err(e) = crate::prelude::announce(
+    if let Err(e) = announce(
         ctx,
         msg,
         &format!("unknown command: {}", unknown_command_name),

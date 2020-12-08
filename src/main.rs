@@ -45,7 +45,6 @@ async fn main() {
         .group(&commands::MUFFETBOT_GROUP)
         .group(&commands::SOCIALS_GROUP);
     let mut client = serenity::client::Client::builder(&token)
-        .event_handler(Handler::new())
         .framework(framework)
         .await
         .expect("Err creating client");
