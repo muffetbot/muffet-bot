@@ -7,20 +7,13 @@ pub(crate) use commands::prelude;
 use utils::boiler::*;
 pub(crate) use utils::net::Links;
 
-use serenity::prelude::*;
-use serenity::{framework::standard::StandardFramework, http::Http, model::user::User};
+use crate::prelude::*;
+use serenity::{framework::standard::{StandardFramework, macros::group}, http::Http, model::user::User};
 use std::{collections::HashSet, env, sync::Arc};
-
-use flexi_logger::{writers::FileLogWriter, Age, Cleanup, Criterion, Naming};
-use std::path::PathBuf;
 
 use once_cell::sync::Lazy;
 static OWNER: Lazy<Mutex<User>> = Lazy::new(|| Mutex::default());
 
-static LOG_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("~/"));
-
-use crate::prelude::*;
-use serenity::framework::standard::macros::group;
 #[group]
 #[commands(get_test_fn)]
 struct DynCmdGrp;
