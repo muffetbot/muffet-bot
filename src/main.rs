@@ -11,12 +11,25 @@ use serenity::prelude::*;
 use serenity::{framework::standard::StandardFramework, http::Http, model::user::User};
 use std::{collections::HashSet, env, sync::Arc};
 
-use once_cell::sync::Lazy;
+use flexi_logger::{writers::FileLogWriter, Age, Cleanup, Criterion, Naming};
+use std::path::PathBuf;
 
+use once_cell::sync::Lazy;
 static OWNER: Lazy<Mutex<User>> = Lazy::new(|| Mutex::default());
+
+static LOG_PATH: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("~/"));
+
+use crate::prelude::*;
+use serenity::framework::standard::macros::group;
+#[group]
+#[commands(get_test_fn)]
+struct DynCmdGrp;
 
 #[tokio::main]
 async fn main() {
+    crate::commandify!(test_fn, "https://www.duck.com");
+    let _logger = utils::logger::crate_logger().expect("unable to initiate logger");
+
     let token = env::var("DISCORD_TOKEN").expect("unable to fetch token from env");
     let http = Http::new_with_token(&token);
     let (owners, bot_id) = match http.get_current_application_info().await {
@@ -43,6 +56,7 @@ async fn main() {
         .unrecognised_command(unknown_command)
         .help(&MUFFET_HELP)
         .group(&commands::MUFFETBOT_GROUP)
+        .group(&DYNCMDGRP_GROUP)
         .group(&commands::SOCIALS_GROUP);
     let mut client = serenity::client::Client::builder(&token)
         .framework(framework)
@@ -53,6 +67,6 @@ async fn main() {
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
     }
     if let Err(e) = client.start().await {
-        println!("Client error: {:#?}", e);
+        error!("Client error: {:#?}", e);
     }
 }
