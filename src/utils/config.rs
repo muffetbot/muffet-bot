@@ -99,7 +99,7 @@ impl Config {
                 }
                 cmds.push(new_command);
             }
-            None => self.commands = vec![new_command],
+            None => self.commands = Some(vec![new_command]),
         }
 
         Ok(())
