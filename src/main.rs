@@ -4,29 +4,42 @@ mod commands;
 mod utils;
 
 pub(crate) use commands::prelude;
-use utils::boiler::*;
+use utils::discord::*;
 pub(crate) use utils::net::Links;
 
 use crate::prelude::*;
-use serenity::{framework::standard::{StandardFramework, macros::group}, http::Http, model::user::User};
+use serenity::{framework::standard::StandardFramework, http::Http, model::user::User};
 use std::{collections::HashSet, env, sync::Arc};
 
 use once_cell::sync::Lazy;
 static OWNER: Lazy<Mutex<User>> = Lazy::new(|| Mutex::default());
 
-#[group]
-#[commands(get_test_fn)]
-struct DynCmdGrp;
+use utils::config::ConfigData;
+static CONFIG: Lazy<Mutex<ConfigData>> = Lazy::new(|| Mutex::default());
 
 #[tokio::main]
-async fn main() {
-    crate::commandify!(test_fn, "https://www.duck.com");
-    let _logger = utils::logger::crate_logger().expect("unable to initiate logger");
+async fn main() -> anyhow::Result<()> {
+    let config_path = match env::var("MUFFETBOT_CONFIG") {
+        Ok(path) => path,
+        _ => {
+            utils::config::init()?;
+            env::var("MUFFETBOT_CONFIG")
+                .expect("Please set MUFFETBOT_CONFIG env. Unable to find config file.")
+        }
+    };
 
-    let token = env::var("DISCORD_TOKEN").expect("unable to fetch token from env");
+    use utils::{config::get_conf, logger::crate_logger};
+    let config = get_conf(&config_path).await?;
+    let token = config.get_token();
+    let config_data = config.data().await;
+
+    let _logger = crate_logger(&config_data.log_path).expect("unable to initiate logger");
+    *CONFIG.lock().await = config_data;
+
     let http = Http::new_with_token(&token);
     let (owners, bot_id) = match http.get_current_application_info().await {
-        Ok(info) => {
+        Ok(mut info) => {
+            info.name = (&(*CONFIG)).lock().await.bot_alias.clone();
             let mut owners = HashSet::new();
             owners.insert(info.owner.id);
 
@@ -49,7 +62,6 @@ async fn main() {
         .unrecognised_command(unknown_command)
         .help(&MUFFET_HELP)
         .group(&commands::MUFFETBOT_GROUP)
-        .group(&DYNCMDGRP_GROUP)
         .group(&commands::SOCIALS_GROUP);
     let mut client = serenity::client::Client::builder(&token)
         .framework(framework)
@@ -62,4 +74,6 @@ async fn main() {
     if let Err(e) = client.start().await {
         error!("Client error: {:#?}", e);
     }
+
+    Ok(())
 }
