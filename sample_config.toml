@@ -1,0 +1,24 @@
+# MuffetBot configuration file
+
+bot_alias = "muffetbot"
+discord_token = "xVB3W344fmF8BfhDkP.b59s39wKZweTcKTg3Vcsey.PBo8n7j2NFehXTy623"
+log_path = "~/.local/share/muffetbot-logs"
+
+# this message will display prior to a list of commands when calling !help
+help_message = "Look at all deez commands"
+site_url = "https://www.mysite.com"
+
+[[command]]
+name = "about"
+path = "/about"
+
+[[command]]
+name = "pobox"
+target = """
+PO Box 000000
+City, State 181818
+"""
+
+[[command]]
+name = "twitter"
+target = "https://www.twitter.com/"

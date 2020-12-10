@@ -29,7 +29,7 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "!help" {
-            let borrowed_config = &(&(*crate::CONFIG)).lock().await;
+            let borrowed_config = &(&crate::CONFIG).lock().await;
             let config_help_message = &borrowed_config.help_message;
             let config_commands = (&borrowed_config.commands).into_iter().fold(
                 String::new(),
@@ -75,7 +75,7 @@ pub async fn muffet_help(
 
 #[hook]
 pub async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
-    let config_commands = &(&(*crate::CONFIG)).lock().await.commands;
+    let config_commands = &(&crate::CONFIG).lock().await.commands;
 
     for cmd in config_commands {
         if unknown_command_name.trim() == cmd.0 {

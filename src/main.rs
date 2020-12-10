@@ -31,15 +31,15 @@ async fn main() -> anyhow::Result<()> {
     use utils::{config::get_conf, logger::crate_logger};
     let config = get_conf(&config_path).await?;
     let token = config.get_token();
+    let _logger = crate_logger(config.get_log_path()).expect("unable to initiate logger");
     let config_data = config.data().await;
 
-    let _logger = crate_logger(&config_data.log_path).expect("unable to initiate logger");
     *CONFIG.lock().await = config_data;
 
     let http = Http::new_with_token(&token);
     let (owners, bot_id) = match http.get_current_application_info().await {
         Ok(mut info) => {
-            info.name = (&(*CONFIG)).lock().await.bot_alias.clone();
+            info.name = (&CONFIG).lock().await.bot_alias.clone();
             let mut owners = HashSet::new();
             owners.insert(info.owner.id);
 
