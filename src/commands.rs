@@ -12,7 +12,7 @@ use steel_cut_kawaii::*;
 use serenity::framework::standard::macros::group;
 
 #[group]
-#[commands(addcom)]
+#[commands(addcom, rmcom, set_help)]
 struct Admin;
 
 #[group]

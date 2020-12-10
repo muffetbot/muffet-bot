@@ -84,29 +84,26 @@ impl Config {
     }
 
     pub async fn push_command(&mut self, command_name: &str, command_target: &str) -> Result<()> {
-        let new_command = Command {
+        if self.command_exists(command_name) {
+            anyhow::bail!("{} already exists!", command_name)
+        }
+
+        let mut cmds = match &self.commands {
+            Some(c) => c.clone(),
+            None => Vec::new(),
+        };
+        cmds.push(Command {
             name: command_name.to_owned(),
             target: Some(command_target.to_owned()),
             url_path: None,
-        };
-
-        match &self.commands {
-            Some(mut cmds) => {
-                for cmd in cmds {
-                    if cmd.name == new_command.name {
-                        anyhow::bail!("{} already exists!", cmd.name)
-                    }
-                }
-                cmds.push(new_command);
-            }
-            None => self.commands = Some(vec![new_command]),
-        }
+        });
+        self.commands = Some(cmds);
 
         Ok(())
     }
 
     fn command_exists(&self, command_name: &str) -> bool {
-        if let Some(cmds) = self.commands {
+        if let Some(cmds) = &self.commands {
             for cmd in cmds {
                 if cmd.name == command_name {
                     return true;

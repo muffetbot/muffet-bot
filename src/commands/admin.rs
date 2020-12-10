@@ -60,7 +60,7 @@ async fn set_help(ctx: &Context, msg: &Message) -> CommandResult {
         let config_path = std::env::var("MUFFETBOT_CONFIG")?;
         let mut config = get_conf(&config_path).await?;
 
-        let new_help = content_safe(&ctx.cache, msg.content, &ContentSafeOptions::default()).await;
+        let new_help = content_safe(&ctx.cache, &msg.content, &ContentSafeOptions::default()).await;
         config.set_help(new_help).await;
 
         hot_reload_conf(config_path, config).await?;
