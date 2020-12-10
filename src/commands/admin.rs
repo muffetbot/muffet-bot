@@ -28,7 +28,11 @@ async fn addcom(ctx: &Context, msg: &Message) -> CommandResult {
         hot_reload_conf(config_path, config).await?;
         announce(ctx, msg, format!("added the <{}> command!", cmd)).await
     } else {
-        announce(ctx, msg, "You do not have permission to use this command").await
+        error!(
+            "{} tried addcom with insufficient permissions",
+            msg.author.name
+        );
+        Ok(())
     }
 }
 
@@ -50,7 +54,11 @@ async fn rmcom(ctx: &Context, msg: &Message) -> CommandResult {
         hot_reload_conf(config_path, config).await?;
         announce(ctx, msg, "command deleted!").await
     } else {
-        announce(ctx, msg, "You do not have permission to use this command").await
+        error!(
+            "{} tried rmcom with insufficient permissions",
+            msg.author.name
+        );
+        Ok(())
     }
 }
 
@@ -66,6 +74,10 @@ async fn set_help(ctx: &Context, msg: &Message) -> CommandResult {
         hot_reload_conf(config_path, config).await?;
         announce(ctx, msg, "Help message changed!").await
     } else {
-        announce(ctx, msg, "You do not have permission to use this command").await
+        error!(
+            "{} tried set_help with insufficient permissions",
+            msg.author.name
+        );
+        Ok(())
     }
 }

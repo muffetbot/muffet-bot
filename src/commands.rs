@@ -12,6 +12,8 @@ use steel_cut_kawaii::*;
 use serenity::framework::standard::macros::group;
 
 #[group]
+#[owners_only]
+#[help_available(false)]
 #[commands(addcom, rmcom, set_help)]
 struct Admin;
 
