@@ -15,7 +15,7 @@ where
     let content = content_safe(&ctx.cache, announcement, &ContentSafeOptions::default()).await;
 
     if let Err(e) = msg.channel_id.say(&ctx.http, &content).await {
-        eprintln!("Error sending message: {:#?}", e);
+        error!("Error sending message: {:#?}", e);
     }
 
     Ok(())
