@@ -1,6 +1,5 @@
 /// SEE https://github.com/serenity-rs/serenity/blob/current/examples/e05_command_framework/src/main.rs for example
 use serenity::{
-    async_trait,
     client::bridge::gateway::ShardManager,
     framework::standard::{
         help_commands,
@@ -20,38 +19,24 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
-use crate::prelude::announce;
+use crate::prelude::*;
 use log::*;
 
-pub struct Handler;
+const ADMIN_HELP: &str = r#"
+Admin commands:
+addcom: add a command
+    usage: `!addcom <command trigger> <display value>`
+    example: `!addcom ig https://www.instagram.com/me`
 
-#[async_trait]
-impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!help" {
-            let borrowed_config = &(&crate::CONFIG).lock().await;
-            let config_help_message = &borrowed_config.help_message;
-            let config_commands = (&borrowed_config.commands).into_iter().fold(
-                String::new(),
-                |mut help_msg, (name, _target)| {
-                    help_msg.push_str("\n");
-                    help_msg.push_str(&name);
-                    help_msg
-                },
-            );
+rmcom: remove a command
+    usage: `!rmcom <command trigger>`
+    example: `!rmcom ig`
 
-            if let Err(e) = announce(
-                &ctx,
-                &msg,
-                format!("{}\n\n{}", config_help_message, config_commands),
-            )
-            .await
-            {
-                error!("{}", e);
-            }
-        }
-    }
-}
+set_help: change the message that displays before the help command
+    usage: `!set_help <new help message>`
+    example: `!set_help this is my new help message`
+    
+"#;
 
 #[help]
 #[command_not_found_text = "`{}` is not a command!"]
@@ -59,28 +44,53 @@ impl EventHandler for Handler {
 #[strikethrough_commands_tip_in_dm = ""]
 #[strikethrough_commands_tip_in_guild = ""]
 pub async fn muffet_help(
-    context: &Context,
+    ctx: &Context,
     msg: &Message,
     args: Args,
     help_options: &'static HelpOptions,
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
-    if let Err(e) = announce(context, msg, "Hi!").await {
-        error!("{}", e);
+    if msg.author == *crate::OWNER.lock().await {
+        if let Err(e) = announce(ctx, msg, ADMIN_HELP, &CommandResponse::Dm).await {
+            error!("Admin help commands failure: {}", e.to_string());
+        }
     }
-    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+
+    let content = &msg.content;
+    let mut help_message = String::new();
+    let borrowed_config = &crate::CONFIG.lock().await;
+    let commands = &borrowed_config.commands;
+
+    if let Some(subcommand) = &content.splitn(2, "!help").nth(1) {
+        let subcommand = subcommand.trim_start();
+        for cmd in commands {
+            if subcommand.starts_with(cmd.get_trigger()) {
+                help_message += &format!("{}: {}", cmd.get_trigger(), cmd.get_help());
+                break;
+            }
+        }
+    } else {
+        help_message += &format!("{}\n\n", &borrowed_config.help_message);
+        for cmd in commands {
+            help_message += &format!("{}\n", cmd.get_trigger());
+        }
+    }
+    if let Err(e) = announce(ctx, msg, help_message, &CommandResponse::Channel).await {
+        error!("Help command failed: {}", e);
+    }
+    let _ = help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
     Ok(())
 }
 
 #[hook]
 pub async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
-    let config_commands = &(&crate::CONFIG).lock().await.commands;
+    let config_commands = &(&crate::CONFIG.lock().await).commands;
 
     for cmd in config_commands {
-        if unknown_command_name.trim() == cmd.0 {
-            if let Err(e) = announce(ctx, msg, &cmd.1).await {
-                error!("{}", e);
+        if unknown_command_name.trim() == cmd.get_trigger() {
+            if let Err(e) = announce(ctx, msg, &cmd.get_value(), &cmd.get_response_type()).await {
+                error!("Config command announcement failed: {}", e);
             }
         }
     }

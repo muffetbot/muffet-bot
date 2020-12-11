@@ -3,11 +3,8 @@ pub mod prelude;
 mod admin;
 use admin::*;
 
-mod minecraft_server;
-use minecraft_server::*;
-
-mod steel_cut_kawaii;
-use steel_cut_kawaii::*;
+mod builtin;
+use builtin::*;
 
 use serenity::framework::standard::macros::group;
 
@@ -18,13 +15,5 @@ use serenity::framework::standard::macros::group;
 struct Admin;
 
 #[group]
-#[commands(about, donate, goal, goals, minecraft, shop, stream)]
+#[commands(about, goal, goals, minecraft, shop)]
 struct MuffetBot;
-
-mod socials;
-use socials::*;
-
-/// any new socials functions should preferrably go here, though they will still work if added to MuffetBot
-#[group]
-#[commands(email, patreon, twitter, venmo, youtube)]
-struct Socials;

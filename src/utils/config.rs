@@ -2,10 +2,19 @@ use anyhow::Result;
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum CommandResponse {
+    Channel,
+    Dm,
+    Reply,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 struct Command {
     name: String,
+    help: Option<String>,
     #[serde(rename = "path")]
     url_path: Option<String>,
+    response_type: Option<CommandResponse>,
     target: Option<String>,
 }
 
@@ -21,11 +30,48 @@ pub struct Config {
     commands: Option<Vec<Command>>,
 }
 
+pub struct CommandData {
+    help: String,
+    response_type: CommandResponse,
+    trigger: String,
+    value: String,
+}
+
+impl Default for CommandData {
+    fn default() -> Self {
+        Self {
+            response_type: CommandResponse::Channel,
+            trigger: "".to_owned(),
+            value: "".to_owned(),
+            help: "No help available for this command".to_owned(),
+        }
+    }
+}
+
+impl CommandData {
+    pub fn get_help(&self) -> &str {
+        &self.help
+    }
+
+    pub fn get_response_type(&self) -> &CommandResponse {
+        &self.response_type
+    }
+
+    pub fn get_trigger(&self) -> &str {
+        &self.trigger
+    }
+
+    pub fn get_value(&self) -> &str {
+        &self.value
+    }
+}
+
 #[derive(Default)]
 pub struct ConfigData {
     pub bot_alias: String,
-    pub commands: Vec<(String, String)>,
+    pub commands: Vec<CommandData>,
     pub help_message: String,
+    pub site_url: String,
 }
 
 impl Config {
@@ -47,8 +93,12 @@ impl Config {
                 let mut commands = Vec::new();
                 if let Some(conf_commands) = self.commands {
                     for cmd in conf_commands {
-                        if let Some(target) = cmd.target {
-                            commands.push((cmd.name.trim().to_lowercase(), target));
+                        let help = cmd
+                            .help
+                            .unwrap_or("No help available for this command".to_string());
+                        let response_type = cmd.response_type.unwrap_or(CommandResponse::Channel);
+                        let value = if let Some(target) = cmd.target {
+                            target
                         } else if let Some(mut url_path) = cmd.url_path {
                             if !url_path.starts_with("/") {
                                 url_path = String::from("/") + url_path.as_ref();
@@ -58,11 +108,26 @@ impl Config {
                                 Some(base_url) => base_url.clone() + url_path.as_ref(),
                                 None => url_path,
                             };
-                            commands.push((cmd.name.trim().to_lowercase(), path));
-                        }
+                            path
+                        } else {
+                            continue;
+                        };
+
+                        commands.push(CommandData {
+                            response_type,
+                            trigger: cmd.name.trim().to_lowercase(),
+                            value,
+                            help,
+                        });
                     }
                 }
                 commands
+            },
+            site_url: {
+                match self.site_url {
+                    Some(url) => url,
+                    None => String::new(),
+                }
             },
         }
     }
@@ -83,9 +148,13 @@ impl Config {
         self.help_message = Some(new_message);
     }
 
-    pub async fn push_command(&mut self, command_name: &str, command_target: &str) -> Result<()> {
+    pub async fn push_command(
+        &mut self,
+        command_name: &str,
+        command_target: &str,
+    ) -> Result<(), ()> {
         if self.command_exists(command_name) {
-            anyhow::bail!("{} already exists!", command_name)
+            return Err(());
         }
 
         let mut cmds = match &self.commands {
@@ -94,6 +163,8 @@ impl Config {
         };
         cmds.push(Command {
             name: command_name.to_owned(),
+            help: None,
+            response_type: Some(CommandResponse::Channel),
             target: Some(command_target.to_owned()),
             url_path: None,
         });
@@ -113,7 +184,7 @@ impl Config {
         false
     }
 
-    pub async fn pop_command(&mut self, command_name: &str) -> Result<()> {
+    pub async fn pop_command(&mut self, command_name: &str) -> Result<(), ()> {
         if self.command_exists(command_name) {
             let mut cmds = self.commands.clone().unwrap();
             cmds.retain(|c| c.name != command_name);
@@ -121,7 +192,7 @@ impl Config {
             self.commands = Some(cmds);
             Ok(())
         } else {
-            anyhow::bail!("Command does not exist!")
+            Err(())
         }
     }
 }

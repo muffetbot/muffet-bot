@@ -2,7 +2,7 @@ use anyhow::Result;
 use flexi_logger::{writers::FileLogWriter, Age, Cleanup, Criterion, Naming};
 
 pub fn crate_logger<P: Into<std::path::PathBuf>>(path: P) -> Result<FileLogWriter> {
-    let _logger = FileLogWriter::builder()
+    let logger = FileLogWriter::builder()
         .directory(path)
         .discriminant("MBOT")
         .rotate(
@@ -12,5 +12,5 @@ pub fn crate_logger<P: Into<std::path::PathBuf>>(path: P) -> Result<FileLogWrite
         )
         .print_message()
         .try_build()?;
-    Ok(_logger)
+    Ok(logger)
 }

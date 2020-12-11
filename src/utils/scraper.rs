@@ -36,10 +36,10 @@ impl SteelCutter {
             .user_agent(DUMMY_USER_AGENT)
             .build()?;
 
-        let response = client.get(self.page.as_ref()).send().await;
+        let response = client.get(&self.page.display().await).send().await;
         let body = response?.text().await?;
 
-        let parser = match easy_scraper::Pattern::new(self.page.pattern()) {
+        let parser = match easy_scraper::Pattern::new(self.page.pattern().await) {
             Ok(pattern) => pattern,
             Err(e) => anyhow::bail!(e),
         };
@@ -50,7 +50,7 @@ impl SteelCutter {
         Ok(())
     }
 
-    // retrieve a single node value, returns only the first to match
+    /// retrieve a single node value, returns only the first to match
     pub fn get_node_val<'a, 'b>(&'a self, key: &'b str) -> Option<&'a str> {
         if let Some(tree) = self.node_tree.get() {
             tree.iter().fold(None, |none, node| {
@@ -64,7 +64,7 @@ impl SteelCutter {
         }
     }
 
-    // retrieves all matching node values
+    /// retrieves all matching node values
     pub fn get_nodes_vec(&self, key: &str) -> Option<Vec<SmartString<Compact>>> {
         if let Some(tree) = self.node_tree.get() {
             let mut output = vec![];

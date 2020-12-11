@@ -2,82 +2,170 @@ use crate::prelude::*;
 use crate::utils::config::{get_conf, hot_reload_conf};
 use serenity::utils::{content_safe, ContentSafeOptions};
 
+#[derive(Debug)]
+enum CommandReloadAction {
+    Append,
+    Remove,
+}
+
+#[derive(Debug)]
+enum AllowedReloads {
+    Help,
+    Commands(CommandReloadAction),
+}
+
+#[derive(Debug)]
+enum HotReloadError {
+    EnvMissing,
+    FetchFailed,
+    ImproperFormat,
+    OperationFailed,
+    PermissionDenied,
+    WriteFailed,
+}
+
+impl std::fmt::Display for HotReloadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use HotReloadError::*;
+        let msg = match self {
+            EnvMissing => "MUFFETBOT_CONFIG env var not found",
+            FetchFailed => "Unable to find config file",
+            ImproperFormat => "",
+            OperationFailed => "Unable to complete operation",
+            PermissionDenied => "",
+            WriteFailed => "Unable to write new config to file",
+        };
+
+        write!(f, "{}", msg)
+    }
+}
+
 async fn has_permissions(msg: &Message) -> bool {
-    let owner = &crate::OWNER.lock().await.clone();
-    &msg.author == owner
+    msg.author == *crate::OWNER.lock().await
+}
+
+async fn try_hot_reload(
+    ctx: &Context,
+    msg: &Message,
+    discrim: AllowedReloads,
+) -> anyhow::Result<String, HotReloadError> {
+    use HotReloadError::*;
+    if !has_permissions(msg).await {
+        return Err(PermissionDenied);
+    }
+
+    let config_path = match std::env::var("MUFFETBOT_CONFIG") {
+        Ok(env) => env,
+        _ => return Err(EnvMissing),
+    };
+
+    let mut config = match get_conf(&config_path).await {
+        Ok(conf) => conf,
+        _ => return Err(FetchFailed),
+    };
+
+    async fn safeify<S: AsRef<str>>(context: &Context, msg: S) -> String {
+        let opts = ContentSafeOptions::new().clean_everyone(false);
+        content_safe(&context.cache, msg, &opts).await
+    }
+
+    let mut success_msg = String::new();
+    let safe_content = safeify(ctx, &msg.content).await;
+    match discrim {
+        AllowedReloads::Help => {
+            config.set_help(safe_content).await;
+            success_msg += "Help message successfully changed!";
+        }
+        AllowedReloads::Commands(action) => {
+            use CommandReloadAction::*;
+            let mut split_msg = safe_content.trim_start().splitn(2, " ");
+
+            let cmd = split_msg.next();
+            if cmd.is_none() {
+                return Err(ImproperFormat);
+            }
+            let cmd = cmd.unwrap();
+
+            match action {
+                Append => {
+                    let target = split_msg.next();
+                    if target.is_none() {
+                        return Err(ImproperFormat);
+                    }
+
+                    if config.push_command(&cmd, &target.unwrap()).await.is_err() {
+                        return Err(OperationFailed);
+                    } else {
+                        success_msg = format!("added the <{}> command!", cmd);
+                    }
+                }
+                Remove => {
+                    if config.pop_command(cmd).await.is_err() {
+                        return Err(OperationFailed);
+                    } else {
+                        success_msg = format!("removed the <{}> command!", cmd);
+                    }
+                }
+            }
+        }
+    }
+
+    match hot_reload_conf(config_path, config).await {
+        Ok(_) => Ok(success_msg),
+        Err(_) => Err(WriteFailed),
+    }
 }
 
 #[command]
 async fn addcom(ctx: &Context, msg: &Message) -> CommandResult {
-    if has_permissions(msg).await {
-        let config_path = std::env::var("MUFFETBOT_CONFIG")?;
-        let mut config = get_conf(&config_path).await?;
-
-        let new_command = msg.content.split_whitespace().collect::<Vec<&str>>();
-        if new_command.len() > 2 {
-            return announce(ctx, msg, "usage: !addcom <command name> <command target>").await;
+    let result = match try_hot_reload(
+        ctx,
+        msg,
+        AllowedReloads::Commands(CommandReloadAction::Append),
+    )
+    .await
+    {
+        Ok(success_msg) => success_msg,
+        Err(e) => {
+            let description = e.to_string();
+            error!("{}", &description);
+            description
         }
+    };
 
-        let (cmd, target) = (
-            content_safe(&ctx.cache, &new_command[0], &ContentSafeOptions::default()).await,
-            content_safe(&ctx.cache, &new_command[1], &ContentSafeOptions::default()).await,
-        );
-        if let Err(e) = config.push_command(&cmd, &target).await {
-            return announce(ctx, msg, e.to_string()).await;
-        }
-        hot_reload_conf(config_path, config).await?;
-        announce(ctx, msg, format!("added the <{}> command!", cmd)).await
-    } else {
-        error!(
-            "{} tried addcom with insufficient permissions",
-            msg.author.name
-        );
-        Ok(())
-    }
+    announce(ctx, msg, result, &CommandResponse::Dm).await
 }
 
 #[command]
 async fn rmcom(ctx: &Context, msg: &Message) -> CommandResult {
-    if has_permissions(msg).await {
-        let config_path = std::env::var("MUFFETBOT_CONFIG")?;
-        let mut config = get_conf(&config_path).await?;
-
-        let to_rm = msg.content.split_whitespace().collect::<Vec<&str>>();
-        if to_rm.len() > 1 {
-            return announce(ctx, msg, "usage: !rmcom <command name>").await;
+    let result = match try_hot_reload(
+        ctx,
+        msg,
+        AllowedReloads::Commands(CommandReloadAction::Remove),
+    )
+    .await
+    {
+        Ok(success_msg) => success_msg,
+        Err(e) => {
+            let description = e.to_string();
+            error!("{}", &description);
+            description
         }
+    };
 
-        let target = &to_rm[0];
-        if let Err(e) = config.pop_command(target).await {
-            return announce(ctx, msg, e.to_string()).await;
-        }
-        hot_reload_conf(config_path, config).await?;
-        announce(ctx, msg, "command deleted!").await
-    } else {
-        error!(
-            "{} tried rmcom with insufficient permissions",
-            msg.author.name
-        );
-        Ok(())
-    }
+    announce(ctx, msg, result, &CommandResponse::Dm).await
 }
 
 #[command]
 async fn set_help(ctx: &Context, msg: &Message) -> CommandResult {
-    if has_permissions(msg).await {
-        let config_path = std::env::var("MUFFETBOT_CONFIG")?;
-        let mut config = get_conf(&config_path).await?;
+    let result = match try_hot_reload(ctx, msg, AllowedReloads::Help).await {
+        Ok(success_msg) => success_msg,
+        Err(e) => {
+            let description = e.to_string();
+            error!("{}", &description);
+            description
+        }
+    };
 
-        let new_help = content_safe(&ctx.cache, &msg.content, &ContentSafeOptions::default()).await;
-        config.set_help(new_help).await;
-
-        hot_reload_conf(config_path, config).await?;
-        announce(ctx, msg, "Help message changed!").await
-    } else {
-        error!(
-            "{} tried set_help with insufficient permissions",
-            msg.author.name
-        );
-        Ok(())
-    }
+    announce(ctx, msg, result, &CommandResponse::Dm).await
 }
