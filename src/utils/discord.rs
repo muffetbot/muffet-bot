@@ -51,8 +51,8 @@ pub async fn muffet_help(
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
-    if msg.author == *crate::OWNER.lock().await {
-        if let Err(e) = announce(ctx, msg, ADMIN_HELP, &CommandResponse::Dm).await {
+    if has_permissions(msg).await {
+        if let Err(e) = announce(ctx, msg, ADMIN_HELP, &CommandResponse::DmOwner).await {
             error!("Admin help commands failure: {}", e.to_string());
         }
     }
@@ -85,7 +85,7 @@ pub async fn muffet_help(
 
 #[hook]
 pub async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
-    let config_commands = &(&crate::CONFIG.lock().await).commands;
+    let config_commands = &crate::CONFIG.lock().await.commands;
 
     for cmd in config_commands {
         if unknown_command_name.trim() == cmd.get_trigger() {

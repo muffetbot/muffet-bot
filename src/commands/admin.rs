@@ -40,10 +40,6 @@ impl std::fmt::Display for HotReloadError {
     }
 }
 
-async fn has_permissions(msg: &Message) -> bool {
-    msg.author == *crate::OWNER.lock().await
-}
-
 async fn try_hot_reload(
     ctx: &Context,
     msg: &Message,
@@ -133,7 +129,7 @@ async fn addcom(ctx: &Context, msg: &Message) -> CommandResult {
         }
     };
 
-    announce(ctx, msg, result, &CommandResponse::Dm).await
+    announce(ctx, msg, result, &CommandResponse::DmOwner).await
 }
 
 #[command]
@@ -153,7 +149,7 @@ async fn rmcom(ctx: &Context, msg: &Message) -> CommandResult {
         }
     };
 
-    announce(ctx, msg, result, &CommandResponse::Dm).await
+    announce(ctx, msg, result, &CommandResponse::DmOwner).await
 }
 
 #[command]
@@ -167,5 +163,5 @@ async fn set_help(ctx: &Context, msg: &Message) -> CommandResult {
         }
     };
 
-    announce(ctx, msg, result, &CommandResponse::Dm).await
+    announce(ctx, msg, result, &CommandResponse::DmOwner).await
 }

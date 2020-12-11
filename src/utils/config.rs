@@ -5,6 +5,8 @@ use serde_derive::{Deserialize, Serialize};
 pub enum CommandResponse {
     Channel,
     Dm,
+    #[serde(rename = "dm owner")]
+    DmOwner,
     Reply,
 }
 

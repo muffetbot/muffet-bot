@@ -8,6 +8,10 @@ pub use serenity::{
     model::channel::Message,
 };
 
+pub async fn has_permissions(msg: &Message) -> bool {
+    msg.author == *crate::OWNER.lock().await
+}
+
 /// announces given message to entire thread. `announcement` can be any type that implements as_ref for string slice
 pub async fn announce<S>(
     ctx: &Context,
@@ -20,7 +24,8 @@ where
 {
     use CommandResponse::*;
     match response_type {
-        Dm => direct_message_admin(ctx, msg, announcement).await,
+        Dm => direct_message(ctx, msg, announcement, false).await,
+        DmOwner => direct_message(ctx, msg, announcement, true).await,
         Reply => reply_to_sender(ctx, msg, announcement).await,
         Channel => announce_to_channel(ctx, msg, announcement).await,
     }
@@ -43,10 +48,13 @@ where
 }
 
 /// bot sends dm to admin to avoid leaking info to channel
-async fn direct_message_admin<S>(ctx: &Context, msg: &Message, dm: S) -> CommandResult
+async fn direct_message<S>(ctx: &Context, msg: &Message, dm: S, to_owner: bool) -> CommandResult
 where
     S: std::fmt::Display,
 {
+    if to_owner && !has_permissions(msg).await {
+        return Ok(());
+    }
     match msg.author.direct_message(ctx, |m| m.content(dm)).await {
         Ok(_) => Ok(()),
         Err(e) => {

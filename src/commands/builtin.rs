@@ -81,7 +81,7 @@ async fn minecraft(ctx: &Context, msg: &Message) -> CommandResult {
     );
 
     let success_msg = if let Err(e) =
-        announce(ctx, msg, request_invite_msg, &CommandResponse::Dm).await
+        announce(ctx, msg, request_invite_msg, &CommandResponse::DmOwner).await
     {
         error!(
             "MC request by {}: DM to owner failed : {}",
@@ -93,12 +93,13 @@ async fn minecraft(ctx: &Context, msg: &Message) -> CommandResult {
         "Your request has been sent!"
     };
 
-    if let Err(e) = msg.author.dm(ctx, |m| m.content(success_msg)).await {
+    if let Err(e) = announce(ctx, msg, success_msg, &CommandResponse::Dm).await {
         error!(
             "MC request by {}: DM to requester failed : {}",
             &msg.author,
             e.to_string()
         );
     }
+
     Ok(())
 }
