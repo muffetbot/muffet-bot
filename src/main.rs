@@ -5,7 +5,7 @@ mod utils;
 
 pub(crate) use commands::prelude;
 use utils::discord::*;
-pub(crate) use utils::net::Links;
+pub(crate) use utils::scraper::Links;
 
 use crate::prelude::*;
 use serenity::{framework::standard::StandardFramework, http::Http, model::user::User};
@@ -30,6 +30,7 @@ async fn main() -> anyhow::Result<()> {
 
     use utils::{config::get_conf, logger::crate_logger};
     let config = get_conf(&config_path).await?;
+    let prefix = config.get_command_prefix();
     let token = config.get_token();
     let _logger = crate_logger(config.get_log_path()).expect("unable to initiate logger");
     let config_data = config.data().await;
@@ -53,9 +54,9 @@ async fn main() -> anyhow::Result<()> {
     };
     let framework = StandardFramework::new()
         .configure(|c| {
-            c.with_whitespace(true)
+            c.with_whitespace(false)
                 .on_mention(Some(bot_id))
-                .prefix("!")
+                .prefix(prefix)
                 .delimiters(vec![", ", ","])
                 .owners(owners)
         })

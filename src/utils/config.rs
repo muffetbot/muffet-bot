@@ -27,6 +27,7 @@ pub struct Config {
     discord_token: String,
     log_path: String,
     help_message: Option<String>,
+    command_prefix: Option<String>,
     site_url: Option<String>,
     #[serde(rename = "command")]
     commands: Option<Vec<Command>>,
@@ -136,14 +137,20 @@ impl Config {
 
     /// Getter for path to the logs directory.
     /// Changing the log_path requires bot restart, no hot-reload at runtime.
-    pub fn get_log_path(&self) -> String {
-        self.log_path.clone()
+    pub fn get_log_path(&self) -> &str {
+        &self.log_path
+    }
+
+    /// Getter for path to the logs directory.
+    /// Changing the log_path requires bot restart, no hot-reload at runtime.
+    pub fn get_command_prefix(&self) -> &str {
+        &self.command_prefix.unwrap_or("!".to_owned())
     }
 
     /// Getter for discord token (Panics if no token).
     /// Changing the log_path requires bot restart, no hot-reload at runtime.
-    pub fn get_token(&self) -> String {
-        self.discord_token.clone()
+    pub fn get_token(&self) -> &str {
+        &self.discord_token
     }
 
     pub async fn set_help(&mut self, new_message: String) {
@@ -230,20 +237,18 @@ fn query_stdin(question: &str) -> Option<String> {
     }
 }
 
-fn set_muffetbot_env<S: AsRef<str>>(config_path: S) -> Result<()> {
-    let unix_profile = std::fs::canonicalize("~/.profile")?;
+fn set_muffetbot_env<S: std::fmt::Display>(config_path: S) -> Result<()> {
+    let unix_profile = std::fs::canonicalize("~/.profile").expect("~/.profile does not exist!");
     let profile_str = read_to_string(&unix_profile)?;
 
     let mut profile_lines = profile_str.split("\n").collect::<Vec<&str>>();
 
     profile_lines.retain(|ln| !ln.trim_start().starts_with("export MUFFETBOT_CONFIG"));
     let mut profile_string = profile_lines.join("\n");
-    profile_string.push_str(&format!(
-        "\nexport MUFFETBOT_CONFIG=\"{}\"",
-        config_path.as_ref()
-    ));
+    profile_string.push_str(&format!("\nexport MUFFETBOT_CONFIG=\"{}\"", config_path));
 
-    std::fs::write(unix_profile, profile_string)?;
+    std::fs::write(unix_profile, profile_string)
+        .expect("Write failed. Please set $MUFFETBOT_CONFIG manually");
     Ok(())
 }
 
@@ -279,16 +284,25 @@ pub fn init() -> Result<()> {
     };
     create_dir_all(&log_path)?;
 
+    let prefix = match query_stdin(
+        "Do you wish to override the command prefix?\
+        Enter your preference or leave the default value `!`",
+    ) {
+        Some(pre) => pre,
+        None => "!".to_owned(),
+    };
+
     let new_config = Config {
         bot_alias,
         commands: None,
+        command_prefix: Some(prefix),
         discord_token,
         help_message,
         log_path,
         site_url,
     };
 
-    let conf_path = std::path::Path::new(&config_path);
+    let conf_path = Path::new(&config_path);
     if let Some(parent) = conf_path.parent() {
         if !parent.exists() {
             create_dir_all(parent)?;

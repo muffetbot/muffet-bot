@@ -1,4 +1,4 @@
-use crate::Links;
+use log::*;
 use once_cell::sync::OnceCell;
 use smartstring::{Compact, SmartString};
 
@@ -41,11 +41,15 @@ impl SteelCutter {
 
         let parser = match easy_scraper::Pattern::new(self.page.pattern().await) {
             Ok(pattern) => pattern,
-            Err(e) => anyhow::bail!(e),
+            Err(e) => {
+                error!("easy_scraper error: {:?}", e);
+                anyhow::bail!(e)
+            }
         };
         let html_nodes = parser.matches(&body);
-        if self.node_tree.set(html_nodes).is_err() {
-            anyhow::bail!("unable to set SteelCutter.node_tree value")
+        if let Err(e) = self.node_tree.set(html_nodes) {
+            error!("unable to set SteelCutter.node_tree value: {:?}", e);
+            anyhow::bail!(e)
         }
         Ok(())
     }
@@ -80,5 +84,55 @@ impl SteelCutter {
         } else {
             None
         }
+    }
+}
+
+pub enum Links {
+    About,
+    Goals,
+    Shop,
+}
+
+impl Links {
+    /// this method is used by the scraper.
+    /// see https://docs.rs/easy-scraper/0.2.0/easy_scraper/ for documentation
+    pub async fn pattern<'a>(&'a self) -> &'a str {
+        use Links::*;
+        match self {
+            About => {
+                r#"
+            <div data-block-type="2">
+            <p>{{about1}}</p>
+            <p>{{about2}}</p>
+            </div>
+                "#
+            }
+            Goals => {
+                r#"
+		    <li>
+			    <p>{{goal}}</p>
+		    </li>"#
+            }
+            Shop => {
+                r#"
+            <div data-controller="ProductListImageLoader">
+		    <a href="{{shop_url}}" aria-label="{{item_name}}"></a>
+	        </div>
+                "#
+            }
+        }
+    }
+
+    pub async fn display(&self) -> String {
+        use Links::*;
+
+        let mut base_url = (&crate::CONFIG.lock().await).site_url.to_string();
+        match self {
+            About => base_url.push_str("/about"),
+            Goals => base_url.push_str("/goals"),
+            Shop => base_url.push_str("/shop"),
+        }
+
+        base_url
     }
 }

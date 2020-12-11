@@ -30,9 +30,11 @@ impl std::fmt::Display for HotReloadError {
         let msg = match self {
             EnvMissing => "MUFFETBOT_CONFIG env var not found",
             FetchFailed => "Unable to find config file",
-            ImproperFormat => "",
+            ImproperFormat => {
+                "Improper formatting for command. Use the `help` command for more info."
+            }
             OperationFailed => "Unable to complete operation",
-            PermissionDenied => "",
+            PermissionDenied => "Owner use only.",
             WriteFailed => "Unable to write new config to file",
         };
 

@@ -24,6 +24,7 @@ use log::*;
 
 const ADMIN_HELP: &str = r#"
 Admin commands:
+(If you set a command_prefix in the config, replace `!` with your prefix)
 addcom: add a command
     usage: `!addcom <command trigger> <display value>`
     example: `!addcom ig https://www.instagram.com/me`
@@ -39,7 +40,7 @@ set_help: change the message that displays before the help command
 "#;
 
 #[help]
-#[command_not_found_text = "`{}` is not a command!"]
+#[command_not_found_text = ""]
 #[individual_command_tip = ""]
 #[strikethrough_commands_tip_in_dm = ""]
 #[strikethrough_commands_tip_in_guild = ""]
@@ -62,7 +63,7 @@ pub async fn muffet_help(
     let borrowed_config = &crate::CONFIG.lock().await;
     let commands = &borrowed_config.commands;
 
-    if let Some(subcommand) = &content.splitn(2, "!help").nth(1) {
+    if let Some(subcommand) = &content.splitn(2, "help").nth(1) {
         let subcommand = subcommand.trim_start();
         for cmd in commands {
             if subcommand.starts_with(cmd.get_trigger()) {

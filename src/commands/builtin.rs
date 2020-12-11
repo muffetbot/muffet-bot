@@ -11,12 +11,7 @@ async fn shop(ctx: &Context, msg: &Message) -> CommandResult {
                 let zipped = name_nodes.iter().zip(url_nodes).fold(
                     String::new(),
                     |mut message, (name, path)| {
-                        message.push_str(&name);
-                        message.push_str("\n");
-                        let mut url = site_url.clone();
-                        url.push_str(&path);
-                        message.push_str(&url);
-                        message.push_str("\n\n");
+                        message += &format!("{}\n{}{}\n\n", name, &site_url, path);
                         message
                     },
                 );
@@ -48,11 +43,7 @@ async fn goal(ctx: &Context, msg: &Message) -> CommandResult {
     let mut cutter = SteelCutter::new(Links::Goals);
     if cutter.fetch().await.is_ok() {
         if let Some(goal_nodes) = cutter.get_nodes_vec("goal") {
-            let mut rand_int = rand::random::<usize>();
-            let num_goals = goal_nodes.len();
-            if rand_int > num_goals {
-                rand_int = rand_int % num_goals;
-            }
+            let rand_int = rand::random::<usize>() % goal_nodes.len();
             let rand_goal = &goal_nodes[rand_int];
             announce(ctx, msg, rand_goal, &CommandResponse::Reply).await?;
         }
