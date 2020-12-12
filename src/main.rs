@@ -21,11 +21,8 @@ static CONFIG: Lazy<Mutex<ConfigData>> = Lazy::new(|| Mutex::default());
 async fn main() -> anyhow::Result<()> {
     let config_path = match env::var("MUFFETBOT_CONFIG") {
         Ok(path) => path,
-        _ => {
-            utils::config::init()?;
-            env::var("MUFFETBOT_CONFIG")
-                .expect("Please set MUFFETBOT_CONFIG env. Unable to find config file.")
-        }
+        _ => utils::config::init()
+            .expect("Please set MUFFETBOT_CONFIG env. Unable to find config file."),
     };
 
     use utils::{config::get_conf, logger::crate_logger};
@@ -39,8 +36,7 @@ async fn main() -> anyhow::Result<()> {
 
     let http = Http::new_with_token(&token);
     let (owners, bot_id) = match http.get_current_application_info().await {
-        Ok(mut info) => {
-            info.name = (&CONFIG).lock().await.bot_alias.clone();
+        Ok(info) => {
             let mut owners = HashSet::new();
             owners.insert(info.owner.id);
 
@@ -56,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
         .configure(|c| {
             c.with_whitespace(false)
                 .on_mention(Some(bot_id))
-                .prefix(prefix)
+                .prefix(&prefix)
                 .delimiters(vec![", ", ","])
                 .owners(owners)
         })
@@ -75,6 +71,8 @@ async fn main() -> anyhow::Result<()> {
     if let Err(e) = client.start().await {
         error!("Client error: {:#?}", e);
     }
+
+    error!("this is a test");
 
     Ok(())
 }

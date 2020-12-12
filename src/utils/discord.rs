@@ -39,6 +39,49 @@ set_help: change the message that displays before the help command
     
 "#;
 
+use crate::utils::config::{CommandData, ConfigData};
+
+fn flatten_cmds(cmds: &Vec<CommandData>) -> String {
+    let mut flattened = String::new();
+    for cmd in cmds {
+        flattened += &format!("`{}`\n", cmd.get_trigger());
+    }
+    flattened
+}
+
+async fn announce_group_cmds(
+    ctx: &Context,
+    msg: &Message,
+    config_data: &ConfigData,
+) -> CommandResult {
+    msg.channel_id
+        .send_message(&ctx, |m| {
+            m.embed(|embed| {
+                embed.colour(config_data.help_color.clone());
+                embed.description(&config_data.help_message);
+                embed.field("Muffetbot", flatten_cmds(&config_data.commands), true);
+                embed
+            });
+            m
+        })
+        .await?;
+    Ok(())
+}
+
+async fn single_help_cmd(ctx: &Context, msg: &Message, cmd_data: &CommandData) -> CommandResult {
+    msg.channel_id
+        .send_message(&ctx, |m| {
+            m.embed(|embed| {
+                embed.colour(cmd_data.get_color());
+                embed.field(cmd_data.get_trigger(), cmd_data.get_help(), true);
+                embed
+            });
+            m
+        })
+        .await?;
+    Ok(())
+}
+
 #[help]
 #[command_not_found_text = ""]
 #[individual_command_tip = ""]
@@ -59,28 +102,36 @@ pub async fn muffet_help(
     }
 
     let content = &msg.content;
-    let mut help_message = String::new();
+    let mut skip_default_help = false;
     let borrowed_config = &crate::CONFIG.lock().await;
     let commands = &borrowed_config.commands;
 
     if let Some(subcommand) = &content.splitn(2, "help").nth(1) {
-        let subcommand = subcommand.trim_start();
-        for cmd in commands {
-            if subcommand.starts_with(cmd.get_trigger()) {
-                help_message += &format!("{}: {}", cmd.get_trigger(), cmd.get_help());
-                break;
+        if *subcommand == "" {
+            if let Err(e) = announce_group_cmds(ctx, msg, borrowed_config).await {
+                error!("Help command failed: {}", e);
+            }
+        } else {
+            let subcommand = subcommand.trim_start();
+            for cmd in commands {
+                if subcommand.starts_with(cmd.get_trigger()) {
+                    if let Err(e) = single_help_cmd(ctx, msg, cmd).await {
+                        error!("Help command failed: {}", e);
+                    }
+                    skip_default_help = true;
+                    break;
+                }
             }
         }
     } else {
-        help_message += &format!("{}\n\n", &borrowed_config.help_message);
-        for cmd in commands {
-            help_message += &format!("{}\n", cmd.get_trigger());
+        if let Err(e) = announce_group_cmds(ctx, msg, borrowed_config).await {
+            error!("Help command failed: {}", e);
         }
     }
-    if let Err(e) = announce(ctx, msg, help_message, &CommandResponse::Channel).await {
-        error!("Help command failed: {}", e);
+
+    if !skip_default_help {
+        let _ = help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
     }
-    let _ = help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
     Ok(())
 }
 
@@ -89,7 +140,7 @@ pub async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name:
     let config_commands = &crate::CONFIG.lock().await.commands;
 
     for cmd in config_commands {
-        if unknown_command_name.trim() == cmd.get_trigger() {
+        if unknown_command_name == cmd.get_trigger() {
             if let Err(e) = announce(ctx, msg, &cmd.get_value(), &cmd.get_response_type()).await {
                 error!("Config command announcement failed: {}", e);
             }

@@ -43,13 +43,13 @@ impl SteelCutter {
             Ok(pattern) => pattern,
             Err(e) => {
                 error!("easy_scraper error: {:?}", e);
-                anyhow::bail!(e)
+                anyhow::bail!("easy_scraper pattern failed to unwrap")
             }
         };
         let html_nodes = parser.matches(&body);
         if let Err(e) = self.node_tree.set(html_nodes) {
             error!("unable to set SteelCutter.node_tree value: {:?}", e);
-            anyhow::bail!(e)
+            anyhow::bail!("unable to hydrate once_cell with html_nodes")
         }
         Ok(())
     }
