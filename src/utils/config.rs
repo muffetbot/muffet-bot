@@ -6,6 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 pub enum CommandResponse {
     Channel,
     Dm,
+    Embed,
     #[serde(rename = "dm owner")]
     DmOwner,
     Reply,
@@ -19,6 +20,7 @@ impl Default for CommandResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 struct Command {
+    admin: Option<bool>,
     name: String,
     color: Option<Color>,
     help: Option<String>,
@@ -43,6 +45,7 @@ pub struct Config {
 
 #[derive(Debug)]
 pub struct CommandData {
+    admin: bool,
     color: Color,
     help: String,
     response_type: CommandResponse,
@@ -60,6 +63,10 @@ impl Default for CommandData {
 }
 
 impl CommandData {
+    pub fn restricted(&self) -> bool {
+        self.admin
+    }
+
     pub fn get_color(&self) -> Color {
         self.color.clone()
     }
@@ -110,6 +117,7 @@ impl Config {
                 let mut commands = Vec::new();
                 if let Some(conf_commands) = self.commands {
                     for cmd in conf_commands {
+                        let admin = cmd.admin.unwrap_or(false);
                         let help = cmd
                             .help
                             .unwrap_or("No help available for this command".to_string());
@@ -132,6 +140,7 @@ impl Config {
                         };
 
                         commands.push(CommandData {
+                            admin,
                             color,
                             response_type,
                             trigger: cmd.name.trim().to_lowercase(),
@@ -178,6 +187,10 @@ impl Config {
         self.help_message = Some(new_message);
     }
 
+    pub async fn set_color(&mut self, new_color: Color) {
+        self.help_color = Some(new_color);
+    }
+
     /// Attempts to append command to config -
     /// Supports hot reload.
     pub async fn push_command(
@@ -194,6 +207,7 @@ impl Config {
             None => Vec::new(),
         };
         cmds.push(Command {
+            admin: Some(false),
             color: Some(Color::default()),
             name: command_name.to_owned(),
             help: None,
@@ -352,12 +366,12 @@ pub fn init() -> Result<String> {
     };
 
     let new_config = Config {
-        help_color: Some(Color::Kerbal),
+        help_color: Some(Color::BlitzBlue),
         commands: None,
         command_prefix: Some(prefix),
         discord_token,
         help_message,
-        log_path: log_path.to_string_lossy().into(),
+        log_path: log_path.to_string_lossy().to_string(),
         site_url,
     };
 
@@ -374,8 +388,11 @@ pub fn init() -> Result<String> {
     Ok(config_path)
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+use strum::*;
+
+#[derive(AsRefStr, Clone, Debug, Deserialize, EnumIter, Serialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab_case")]
 pub enum Color {
     BlitzBlue = 0x6FC6E2,
     Blue = 0x3498DB,
@@ -409,7 +426,7 @@ pub enum Color {
 
 impl Default for Color {
     fn default() -> Self {
-        Self::Kerbal
+        Self::BlitzBlue
     }
 }
 

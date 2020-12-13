@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::utils::config::{get_conf, hot_reload_conf};
-use serenity::utils::{content_safe, ContentSafeOptions};
 
 #[derive(Debug)]
 enum CommandReloadAction {
@@ -11,6 +10,7 @@ enum CommandReloadAction {
 #[derive(Debug)]
 enum AllowedReloads {
     Help,
+    Color,
     Commands(CommandReloadAction),
 }
 
@@ -20,7 +20,6 @@ enum HotReloadError {
     FetchFailed,
     ImproperFormat,
     OperationFailed,
-    PermissionDenied,
     WriteFailed,
 }
 
@@ -34,7 +33,6 @@ impl std::fmt::Display for HotReloadError {
                 "Improper formatting for command. Use the `help` command for more info."
             }
             OperationFailed => "Unable to complete operation",
-            PermissionDenied => "Owner use only.",
             WriteFailed => "Unable to write new config to file",
         };
 
@@ -42,16 +40,9 @@ impl std::fmt::Display for HotReloadError {
     }
 }
 
-async fn try_hot_reload(
-    ctx: &Context,
-    msg: &Message,
-    discrim: AllowedReloads,
-) -> anyhow::Result<String, HotReloadError> {
+use strum::IntoEnumIterator;
+async fn try_hot_reload(mut args: Args, discrim: AllowedReloads) -> Result<String, HotReloadError> {
     use HotReloadError::*;
-    if !has_permissions(msg).await {
-        return Err(PermissionDenied);
-    }
-
     let config_path = match std::env::var("MUFFETBOT_CONFIG") {
         Ok(env) => env,
         _ => return Err(EnvMissing),
@@ -62,43 +53,61 @@ async fn try_hot_reload(
         _ => return Err(FetchFailed),
     };
 
-    async fn safeify<S: AsRef<str>>(context: &Context, msg: S) -> String {
-        let opts = ContentSafeOptions::new().clean_everyone(false);
-        content_safe(&context.cache, msg, &opts).await
-    }
-
     let mut success_msg = String::new();
-    let safe_content = safeify(ctx, &msg.content).await;
     match discrim {
-        AllowedReloads::Help => {
-            config.set_help(safe_content).await;
-            success_msg += "Help message successfully changed!";
-        }
-        AllowedReloads::Commands(action) => {
-            use CommandReloadAction::*;
-            let mut split_msg = safe_content.trim_start().splitn(2, " ");
+        AllowedReloads::Color => {
+            use crate::utils::config::Color;
 
-            let cmd = split_msg.next();
-            if cmd.is_none() {
-                return Err(ImproperFormat);
-            }
-            let cmd = cmd.unwrap();
+            if let Some(color) = args.remains() {
+                let color = color.trim().to_lowercase();
+                let mut valid = false;
 
-            match action {
-                Append => {
-                    let target = split_msg.next();
-                    if target.is_none() {
-                        return Err(ImproperFormat);
-                    }
-
-                    if config.push_command(&cmd, &target.unwrap()).await.is_err() {
-                        return Err(OperationFailed);
-                    } else {
-                        success_msg = format!("added the <{}> command!", cmd);
+                for colour in Color::iter() {
+                    if colour.as_ref() == color {
+                        config.set_color(colour).await;
+                        success_msg += "Color successfully changed!";
+                        valid = true;
+                        break;
                     }
                 }
-                Remove => {
-                    if config.pop_command(cmd).await.is_err() {
+
+                if !valid {
+                    success_msg += "**Sorry, that's not a valid color!**\n";
+                    for color in Color::iter() {
+                        success_msg += &format!("> *{}*\n", color.as_ref());
+                    }
+                    return Ok(success_msg);
+                }
+            }
+        }
+        AllowedReloads::Help => {
+            success_msg += match args.remains() {
+                Some(help) => {
+                    config.set_help(help.to_string()).await;
+                    "Help message successfully changed!"
+                }
+                None => return Err(ImproperFormat),
+            };
+        }
+        AllowedReloads::Commands(action) => {
+            let cmd = match args.single::<String>() {
+                Ok(cmd) => cmd,
+                _ => return Err(ImproperFormat),
+            };
+
+            match action {
+                CommandReloadAction::Append => match args.remains() {
+                    Some(target) => {
+                        if config.push_command(&cmd, target).await.is_err() {
+                            return Err(OperationFailed);
+                        } else {
+                            success_msg = format!("added the <{}> command!", cmd);
+                        }
+                    }
+                    None => return Err(ImproperFormat),
+                },
+                CommandReloadAction::Remove => {
+                    if config.pop_command(cmd.as_ref()).await.is_err() {
                         return Err(OperationFailed);
                     } else {
                         success_msg = format!("removed the <{}> command!", cmd);
@@ -115,14 +124,51 @@ async fn try_hot_reload(
 }
 
 #[command]
-async fn addcom(ctx: &Context, msg: &Message) -> CommandResult {
-    let result = match try_hot_reload(
-        ctx,
-        msg,
-        AllowedReloads::Commands(CommandReloadAction::Append),
-    )
-    .await
-    {
+#[owners_only]
+#[delimiters(" ")]
+#[description = "add a command"]
+#[usage = "`!addcom ig https://www.instagram.com/me`"]
+#[example = "`!addcom ig https://www.instagram.com/me`"]
+async fn addcom(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let result =
+        match try_hot_reload(args, AllowedReloads::Commands(CommandReloadAction::Append)).await {
+            Ok(success_msg) => success_msg,
+            Err(e) => {
+                let description = e.to_string();
+                error!("{}", &description);
+                description
+            }
+        };
+
+    announce(ctx, msg, result, &CommandResponse::DmOwner).await
+}
+
+#[command]
+#[owners_only]
+#[description = "remove a command"]
+#[usage = "`!rmcom <command trigger>`"]
+#[example = "`!rmcom ig`"]
+async fn rmcom(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let result =
+        match try_hot_reload(args, AllowedReloads::Commands(CommandReloadAction::Remove)).await {
+            Ok(success_msg) => success_msg,
+            Err(e) => {
+                let description = e.to_string();
+                error!("{}", &description);
+                description
+            }
+        };
+
+    announce(ctx, msg, result, &CommandResponse::DmOwner).await
+}
+
+#[command]
+#[owners_only]
+#[description = "change the message that displays before the help command"]
+#[usage = "`!set_help <new help message>`"]
+#[example = "`!set_help this is my new help message`"]
+async fn set_help(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let result = match try_hot_reload(args, AllowedReloads::Help).await {
         Ok(success_msg) => success_msg,
         Err(e) => {
             let description = e.to_string();
@@ -135,29 +181,13 @@ async fn addcom(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-async fn rmcom(ctx: &Context, msg: &Message) -> CommandResult {
-    let result = match try_hot_reload(
-        ctx,
-        msg,
-        AllowedReloads::Commands(CommandReloadAction::Remove),
-    )
-    .await
-    {
-        Ok(success_msg) => success_msg,
-        Err(e) => {
-            let description = e.to_string();
-            error!("{}", &description);
-            description
-        }
-    };
-
-    announce(ctx, msg, result, &CommandResponse::DmOwner).await
-}
-
-#[command]
-async fn set_help(ctx: &Context, msg: &Message) -> CommandResult {
-    let result = match try_hot_reload(ctx, msg, AllowedReloads::Help).await {
-        Ok(success_msg) => success_msg,
+#[owners_only]
+#[description = "change the highlight color for the bot's responses"]
+#[usage = "`!color <new color>`"]
+#[example = "`!color rohrkatze-blue`"]
+async fn color(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let result = match try_hot_reload(args, AllowedReloads::Color).await {
+        Ok(succes_msg) => succes_msg,
         Err(e) => {
             let description = e.to_string();
             error!("{}", &description);

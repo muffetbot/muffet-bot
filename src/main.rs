@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .unrecognised_command(unknown_command)
         .help(&MUFFET_HELP)
         .group(&commands::ADMIN_GROUP)
-        .group(&commands::MUFFETBOT_GROUP);
+        .group(&commands::KAWAII_GROUP);
     let mut client = serenity::client::Client::builder(&token)
         .framework(framework)
         .await

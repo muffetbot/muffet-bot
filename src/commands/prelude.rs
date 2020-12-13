@@ -28,6 +28,7 @@ where
         DmOwner => direct_message(ctx, msg, announcement, true).await,
         Reply => reply_to_sender(ctx, msg, announcement).await,
         Channel => announce_to_channel(ctx, msg, announcement).await,
+        _ => Ok(()),
     }
 }
 
@@ -55,7 +56,20 @@ where
     if to_owner && !has_permissions(msg).await {
         return Ok(());
     }
-    match msg.author.direct_message(ctx, |m| m.content(dm)).await {
+
+    let color = &crate::CONFIG.lock().await.help_color;
+    match msg
+        .author
+        .direct_message(ctx, |m| {
+            m.embed(|embed| {
+                embed.color(color.clone());
+                embed.field("hi!", dm, true);
+                embed
+            });
+            m
+        })
+        .await
+    {
         Ok(_) => Ok(()),
         Err(e) => {
             error!("DM to Admin failed: {}", e.to_string());

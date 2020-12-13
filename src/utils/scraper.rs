@@ -55,7 +55,7 @@ impl SteelCutter {
     }
 
     /// retrieve a single node value, returns only the first to match
-    pub fn get_node_val<'a, 'b>(&'a self, key: &'b str) -> Option<&'a str> {
+    pub fn _get_node_val<'a, 'b>(&'a self, key: &'b str) -> Option<&'a str> {
         if let Some(tree) = self.node_tree.get() {
             tree.iter().fold(None, |none, node| {
                 if let Some(value) = node.get(key) {
@@ -102,8 +102,7 @@ impl Links {
             About => {
                 r#"
             <div data-block-type="2">
-            <p>{{about1}}</p>
-            <p>{{about2}}</p>
+            <p>{{about}}</p>
             </div>
                 "#
             }

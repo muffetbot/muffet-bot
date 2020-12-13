@@ -1,23 +1,29 @@
 # MuffetBot configuration file
 
-bot_alias = "muffetbot"
 discord_token = "xVB3W344fmF8BfhDkP.b59s39wKZweTcKTg3Vcsey.PBo8n7j2NFehXTy623"
-log_path = "~/.local/share/muffetbot-logs"
+log_path = "/home/user/.local/share/muffetbot-logs"
+help_color = "rohrkatze-blue"
 
 # this message will display prior to a list of commands when calling !help
-help_message = "Look at all deez commands"
+help_message = " These are all available commands:"
+command_prefix = "!"
 site_url = "https://www.mysite.com"
 
 [[command]]
+help = "this is the about for about - so meta!"
 name = "about"
 path = "/about"
+color = "dark-gold"
+response_type = "embed"
 
 [[command]]
 name = "pobox"
+color = "rosewater"
 target = """
 PO Box 000000
 City, State 181818
 """
+response_type = "dm"
 
 [[command]]
 name = "twitter"

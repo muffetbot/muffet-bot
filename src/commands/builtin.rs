@@ -1,6 +1,8 @@
 use crate::{prelude::*, Links};
 
 #[command]
+#[description = "support me and buy my poetry!"]
+#[usage = "`!shop`"]
 async fn shop(ctx: &Context, msg: &Message) -> CommandResult {
     let mut cutter = SteelCutter::new(Links::Shop);
     if cutter.fetch().await.is_ok() {
@@ -23,15 +25,14 @@ async fn shop(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[description = "this is the about of about - how meta"]
+#[usage = "`!about`"]
 async fn about(ctx: &Context, msg: &Message) -> CommandResult {
     let mut cutter = SteelCutter::new(Links::About);
     if cutter.fetch().await.is_ok() {
         let mut message = String::new();
-        if let Some(about1) = cutter.get_node_val("about1") {
-            message.push_str(&about1);
-        }
-        if let Some(about2) = cutter.get_node_val("about2") {
-            message.push_str(&about2);
+        if let Some(about_nodes) = cutter.get_nodes_vec("about") {
+            message += &about_nodes[0..2].join("\n\n");
         }
         announce(ctx, msg, message, &CommandResponse::Channel).await?;
     }
@@ -39,6 +40,8 @@ async fn about(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[description = "get a goal at random from steelcutkawaii.com!"]
+#[usage = "`!goal`"]
 async fn goal(ctx: &Context, msg: &Message) -> CommandResult {
     let mut cutter = SteelCutter::new(Links::Goals);
     if cutter.fetch().await.is_ok() {
@@ -52,6 +55,8 @@ async fn goal(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[description = "check out this month's goals!"]
+#[usage = "`!goals`"]
 async fn goals(ctx: &Context, msg: &Message) -> CommandResult {
     announce(
         ctx,
@@ -62,9 +67,9 @@ async fn goals(ctx: &Context, msg: &Message) -> CommandResult {
     .await
 }
 
-/// dm's server owner with request_invite_msg and user's name who made request, then
-/// dm's requester with confirmation/error message.
 #[command]
+#[description = "request an invite to the minecraft server!"]
+#[usage = "`!minecraft`"]
 async fn minecraft(ctx: &Context, msg: &Message) -> CommandResult {
     let request_invite_msg = format!(
         "{} has requested an invite to the minecraft server!",

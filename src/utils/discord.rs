@@ -2,7 +2,6 @@
 use serenity::{
     client::bridge::gateway::ShardManager,
     framework::standard::{
-        help_commands,
         macros::{help, hook},
         Args, CommandGroup, CommandResult, HelpOptions,
     },
@@ -20,46 +19,15 @@ impl TypeMapKey for ShardManagerContainer {
 }
 
 use crate::prelude::*;
+use crate::utils::config::{CommandData, ConfigData};
 use log::*;
 
-const ADMIN_HELP: &str = r#"
-Admin commands:
-(If you set a command_prefix in the config, replace `!` with your prefix)
-addcom: add a command
-    usage: `!addcom <command trigger> <display value>`
-    example: `!addcom ig https://www.instagram.com/me`
-
-rmcom: remove a command
-    usage: `!rmcom <command trigger>`
-    example: `!rmcom ig`
-
-set_help: change the message that displays before the help command
-    usage: `!set_help <new help message>`
-    example: `!set_help this is my new help message`
-    
-"#;
-
-use crate::utils::config::{CommandData, ConfigData};
-
-fn flatten_cmds(cmds: &Vec<CommandData>) -> String {
-    let mut flattened = String::new();
-    for cmd in cmds {
-        flattened += &format!("`{}`\n", cmd.get_trigger());
-    }
-    flattened
-}
-
-async fn announce_group_cmds(
-    ctx: &Context,
-    msg: &Message,
-    config_data: &ConfigData,
-) -> CommandResult {
+async fn embedded_cmd(ctx: &Context, msg: &Message, cmd_data: &CommandData) -> CommandResult {
     msg.channel_id
-        .send_message(&ctx, |m| {
+        .send_message(ctx, |m| {
             m.embed(|embed| {
-                embed.colour(config_data.help_color.clone());
-                embed.description(&config_data.help_message);
-                embed.field("Muffetbot", flatten_cmds(&config_data.commands), true);
+                embed.colour(cmd_data.get_color());
+                embed.field(cmd_data.get_trigger(), cmd_data.get_value(), true);
                 embed
             });
             m
@@ -68,12 +36,12 @@ async fn announce_group_cmds(
     Ok(())
 }
 
-async fn single_help_cmd(ctx: &Context, msg: &Message, cmd_data: &CommandData) -> CommandResult {
-    msg.channel_id
-        .send_message(&ctx, |m| {
+async fn embedded_pm(ctx: &Context, msg: &Message, cmd_data: &CommandMetaData) -> CommandResult {
+    msg.author
+        .direct_message(ctx, |m| {
             m.embed(|embed| {
-                embed.colour(cmd_data.get_color());
-                embed.field(cmd_data.get_trigger(), cmd_data.get_help(), true);
+                embed.colour(cmd_data.color.clone());
+                embed.field(&cmd_data.trigger, &cmd_data.help, true);
                 embed
             });
             m
@@ -83,55 +51,151 @@ async fn single_help_cmd(ctx: &Context, msg: &Message, cmd_data: &CommandData) -
 }
 
 #[help]
-#[command_not_found_text = ""]
-#[individual_command_tip = ""]
-#[strikethrough_commands_tip_in_dm = ""]
-#[strikethrough_commands_tip_in_guild = ""]
 pub async fn muffet_help(
     ctx: &Context,
     msg: &Message,
-    args: Args,
-    help_options: &'static HelpOptions,
+    mut args: Args,
+    _help_options: &'static HelpOptions,
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
-    if has_permissions(msg).await {
-        if let Err(e) = announce(ctx, msg, ADMIN_HELP, &CommandResponse::DmOwner).await {
-            error!("Admin help commands failure: {}", e.to_string());
+    let borrowed_config = &crate::CONFIG.lock().await;
+    let mut caught_error: Result<(), serenity::framework::standard::CommandError> = Ok(());
+
+    let mut commands = vec![];
+    for group in groups {
+        for cmd in group.options.commands {
+            if cmd.options.owners_only && owners.get(&msg.author.id).is_none() {
+                continue;
+            }
+            commands.push(CommandType::Serenity(*cmd).metadata());
         }
     }
+    for cmd in &borrowed_config.commands {
+        if cmd.restricted() && owners.get(&msg.author.id).is_none() {
+            continue;
+        }
+        commands.push(CommandType::Muffet(cmd).metadata());
+    }
 
-    let content = &msg.content;
-    let mut skip_default_help = false;
-    let borrowed_config = &crate::CONFIG.lock().await;
-    let commands = &borrowed_config.commands;
-
-    if let Some(subcommand) = &content.splitn(2, "help").nth(1) {
-        if *subcommand == "" {
-            if let Err(e) = announce_group_cmds(ctx, msg, borrowed_config).await {
-                error!("Help command failed: {}", e);
-            }
-        } else {
-            let subcommand = subcommand.trim_start();
-            for cmd in commands {
-                if subcommand.starts_with(cmd.get_trigger()) {
-                    if let Err(e) = single_help_cmd(ctx, msg, cmd).await {
-                        error!("Help command failed: {}", e);
-                    }
-                    skip_default_help = true;
-                    break;
-                }
+    commands.sort_by(|a, b| a.trigger.partial_cmp(&b.trigger).unwrap());
+    if let Ok(next_arg) = args.single::<String>() {
+        for cmd in &commands {
+            if next_arg == cmd.trigger {
+                caught_error = if cmd.restricted {
+                    embedded_pm(ctx, msg, cmd).await
+                } else {
+                    single_help(ctx, msg, cmd).await
+                };
+                break;
             }
         }
     } else {
-        if let Err(e) = announce_group_cmds(ctx, msg, borrowed_config).await {
-            error!("Help command failed: {}", e);
-        }
+        caught_error = echo_group_cmds(ctx, msg, borrowed_config, &commands).await;
     }
 
-    if !skip_default_help {
-        let _ = help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
+    if let Err(e) = caught_error {
+        error!("Help command failed: {}", e.to_string());
     }
+    Ok(())
+}
+
+use crate::utils::config::Color;
+struct CommandMetaData {
+    color: Color,
+    help: String,
+    restricted: bool,
+    trigger: String,
+}
+
+enum CommandType<'a> {
+    Serenity(&'static serenity::framework::standard::Command),
+    Muffet(&'a CommandData),
+}
+
+impl<'a> CommandType<'a> {
+    fn metadata(self) -> CommandMetaData {
+        match self {
+            CommandType::Serenity(cmd) => CommandMetaData {
+                color: crate::utils::config::Color::default(),
+                help: {
+                    let help = if cmd.options.owners_only {
+                        String::from("*Admin command*\n")
+                    } else {
+                        String::new()
+                    };
+                    if cmd.options.help_available {
+                        help + cmd.options.desc.unwrap_or_default()
+                            + "\n"
+                            + cmd
+                                .options
+                                .usage
+                                .unwrap_or("No help available for this command")
+                            + "\n"
+                            + cmd.options.examples.join("\n").as_ref()
+                    } else {
+                        help
+                    }
+                },
+                restricted: cmd.options.owners_only,
+                trigger: cmd.options.names[0].to_string(),
+            },
+            CommandType::Muffet(cmd) => CommandMetaData {
+                color: cmd.get_color().clone(),
+                help: {
+                    let help = if cmd.restricted() {
+                        String::from("*Admin command*\n")
+                    } else {
+                        String::new()
+                    };
+                    help + cmd.get_help()
+                },
+                restricted: cmd.restricted(),
+                trigger: cmd.get_trigger().to_string(),
+            },
+        }
+    }
+}
+
+fn flatten_cmd_meta(cmds: &Vec<CommandMetaData>) -> String {
+    let mut flattened = String::new();
+    for cmd in cmds {
+        flattened += &format!("`{}`\n", cmd.trigger);
+    }
+    flattened
+}
+
+async fn echo_group_cmds(
+    ctx: &Context,
+    msg: &Message,
+    config_data: &ConfigData,
+    cmds: &Vec<CommandMetaData>,
+) -> CommandResult {
+    msg.channel_id
+        .send_message(&ctx, |m| {
+            m.embed(|embed| {
+                embed.colour(config_data.help_color.clone());
+                embed.description(&config_data.help_message);
+                embed.field("Muffetbot", flatten_cmd_meta(cmds), true);
+                embed
+            });
+            m
+        })
+        .await?;
+    Ok(())
+}
+
+async fn single_help(ctx: &Context, msg: &Message, cmd_data: &CommandMetaData) -> CommandResult {
+    msg.channel_id
+        .send_message(&ctx, |m| {
+            m.embed(|embed| {
+                embed.colour(cmd_data.color.clone());
+                embed.field(&cmd_data.trigger, &cmd_data.help, true);
+                embed
+            });
+            m
+        })
+        .await?;
     Ok(())
 }
 
@@ -141,9 +205,17 @@ pub async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name:
 
     for cmd in config_commands {
         if unknown_command_name == cmd.get_trigger() {
-            if let Err(e) = announce(ctx, msg, &cmd.get_value(), &cmd.get_response_type()).await {
-                error!("Config command announcement failed: {}", e);
+            if let CommandResponse::Embed = cmd.get_response_type() {
+                if let Err(e) = embedded_cmd(ctx, msg, cmd).await {
+                    error!("Config command announcement failed: {}", e);
+                }
+            } else {
+                if let Err(e) = announce(ctx, msg, &cmd.get_value(), &cmd.get_response_type()).await
+                {
+                    error!("Config command announcement failed: {}", e);
+                }
             }
+            break;
         }
     }
 }

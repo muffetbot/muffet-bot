@@ -52,10 +52,11 @@ color = "dark-gold"
 target = "https://www.ranoutofideas.com"
 # this message will be shown if a user types !help idk
 help = "this is the help message for idk"
-# possible values are `dm`, `dm owner`, `reply`, and `channel`
+# possible values are `dm`, `dm owner`, `embed`, `reply`, and `channel`
 # this determines the visibility of the bot's reply
 # a `reply` setting will mention the user in the channel with the response
 # a `dm owner` setting will only work for the server owner, sending them a dm
+# an `embed` setting will be prettier and obey the command's color setting, but will not display link previews
 response_type = "reply"
 ```
 
