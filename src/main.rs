@@ -14,9 +14,10 @@ use std::{collections::HashSet, env, sync::Arc};
 use once_cell::sync::Lazy;
 static OWNER: Lazy<Mutex<User>> = Lazy::new(|| Mutex::default());
 
-use utils::config::ConfigData;
+use utils::config::{get_conf, ConfigData};
 static CONFIG: Lazy<Mutex<ConfigData>> = Lazy::new(|| Mutex::default());
 
+use utils::logger::start_trace_subscriber;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config_path = match env::var("MUFFETBOT_CONFIG") {
@@ -25,12 +26,13 @@ async fn main() -> anyhow::Result<()> {
             .expect("Please set MUFFETBOT_CONFIG env. Unable to find config file."),
     };
 
-    use utils::{config::get_conf, logger::crate_logger};
     let config = get_conf(&config_path).await?;
     let prefix = config.get_command_prefix();
     let token = config.get_token();
-    let _logger = crate_logger(config.get_log_path()).expect("unable to initiate logger");
+    start_trace_subscriber(config.get_log_path());
     let config_data = config.data().await;
+
+    info!("Muffetbot starting up");
 
     *CONFIG.lock().await = config_data;
 
@@ -69,10 +71,9 @@ async fn main() -> anyhow::Result<()> {
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
     }
     if let Err(e) = client.start().await {
-        error!("Client error: {:#?}", e);
+        info!("Client error: {:#?}", e);
+    } else {
+        info!("Client lives!")
     }
-
-    error!("this is a test");
-
     Ok(())
 }

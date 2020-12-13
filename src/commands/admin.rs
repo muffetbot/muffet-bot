@@ -78,6 +78,11 @@ async fn try_hot_reload(mut args: Args, discrim: AllowedReloads) -> Result<Strin
                     }
                     return Ok(success_msg);
                 }
+            } else {
+                for color in Color::iter() {
+                    success_msg += &format!("> *{}*\n", color.as_ref());
+                }
+                return Ok(success_msg);
             }
         }
         AllowedReloads::Help => {
@@ -123,11 +128,12 @@ async fn try_hot_reload(mut args: Args, discrim: AllowedReloads) -> Result<Strin
     }
 }
 
+#[instrument]
 #[command]
 #[owners_only]
 #[delimiters(" ")]
 #[description = "add a command"]
-#[usage = "`!addcom ig https://www.instagram.com/me`"]
+#[usage = "`!addcom ig <command trigger> <command value>`"]
 #[example = "`!addcom ig https://www.instagram.com/me`"]
 async fn addcom(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let result =
@@ -135,7 +141,7 @@ async fn addcom(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
             Ok(success_msg) => success_msg,
             Err(e) => {
                 let description = e.to_string();
-                error!("{}", &description);
+                info!("{}", &description);
                 description
             }
         };
@@ -143,6 +149,7 @@ async fn addcom(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     announce(ctx, msg, result, &CommandResponse::DmOwner).await
 }
 
+#[instrument]
 #[command]
 #[owners_only]
 #[description = "remove a command"]
@@ -154,7 +161,7 @@ async fn rmcom(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
             Ok(success_msg) => success_msg,
             Err(e) => {
                 let description = e.to_string();
-                error!("{}", &description);
+                info!("{}", &description);
                 description
             }
         };
@@ -162,6 +169,7 @@ async fn rmcom(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     announce(ctx, msg, result, &CommandResponse::DmOwner).await
 }
 
+#[instrument]
 #[command]
 #[owners_only]
 #[description = "change the message that displays before the help command"]
@@ -172,7 +180,7 @@ async fn set_help(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
         Ok(success_msg) => success_msg,
         Err(e) => {
             let description = e.to_string();
-            error!("{}", &description);
+            info!("{}", &description);
             description
         }
     };
@@ -180,6 +188,7 @@ async fn set_help(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     announce(ctx, msg, result, &CommandResponse::DmOwner).await
 }
 
+#[instrument]
 #[command]
 #[owners_only]
 #[description = "change the highlight color for the bot's responses"]
@@ -190,7 +199,7 @@ async fn color(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
         Ok(succes_msg) => succes_msg,
         Err(e) => {
             let description = e.to_string();
-            error!("{}", &description);
+            info!("{}", &description);
             description
         }
     };

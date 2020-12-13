@@ -43,7 +43,7 @@ pub struct Config {
     commands: Option<Vec<Command>>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CommandData {
     admin: bool,
     color: Color,
@@ -58,6 +58,37 @@ impl Default for CommandData {
         Self {
             help: "No help available for this command".to_owned(),
             ..Default::default()
+        }
+    }
+}
+
+impl Into<CommandData> for &serenity::framework::standard::Command {
+    fn into(self) -> CommandData {
+        CommandData {
+            admin: self.options.owners_only,
+            color: Color::default(),
+            help: {
+                let help = if self.options.owners_only {
+                    String::from("**admin command**\n")
+                } else {
+                    String::new()
+                };
+                if self.options.help_available {
+                    help + self.options.desc.unwrap_or_default()
+                        + "\n"
+                        + self
+                            .options
+                            .usage
+                            .unwrap_or("No help available for this command")
+                        + "\n"
+                        + self.options.examples.join("\n").as_ref()
+                } else {
+                    help
+                }
+            },
+            response_type: CommandResponse::default(),
+            trigger: self.options.names[0].to_string(),
+            value: String::default(),
         }
     }
 }
@@ -104,13 +135,13 @@ impl Config {
             help_color: {
                 match self.help_color {
                     Some(color) => color,
-                    None => Color::Kerbal,
+                    None => Color::default(),
                 }
             },
             help_message: {
                 match self.help_message {
                     Some(help) => help,
-                    None => String::new(),
+                    None => String::default(),
                 }
             },
             commands: {
@@ -118,9 +149,16 @@ impl Config {
                 if let Some(conf_commands) = self.commands {
                     for cmd in conf_commands {
                         let admin = cmd.admin.unwrap_or(false);
-                        let help = cmd
-                            .help
-                            .unwrap_or("No help available for this command".to_string());
+                        let help = if admin {
+                            String::from("**admin command**\n")
+                                + cmd
+                                    .help
+                                    .unwrap_or("No help available for this command".to_string())
+                                    .as_ref()
+                        } else {
+                            cmd.help
+                                .unwrap_or("No help available for this command".to_string())
+                        };
                         let response_type = cmd.response_type.unwrap_or_default();
                         let color = cmd.color.unwrap_or_default();
                         let value = if let Some(target) = cmd.target {

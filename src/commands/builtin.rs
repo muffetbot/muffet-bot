@@ -67,6 +67,7 @@ async fn goals(ctx: &Context, msg: &Message) -> CommandResult {
     .await
 }
 
+#[instrument]
 #[command]
 #[description = "request an invite to the minecraft server!"]
 #[usage = "`!minecraft`"]
@@ -79,7 +80,7 @@ async fn minecraft(ctx: &Context, msg: &Message) -> CommandResult {
     let success_msg = if let Err(e) =
         announce(ctx, msg, request_invite_msg, &CommandResponse::DmOwner).await
     {
-        error!(
+        info!(
             "MC request by {}: DM to owner failed : {}",
             &msg.author,
             e.to_string()
@@ -90,7 +91,7 @@ async fn minecraft(ctx: &Context, msg: &Message) -> CommandResult {
     };
 
     if let Err(e) = announce(ctx, msg, success_msg, &CommandResponse::Dm).await {
-        error!(
+        info!(
             "MC request by {}: DM to requester failed : {}",
             &msg.author,
             e.to_string()

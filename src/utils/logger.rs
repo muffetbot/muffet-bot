@@ -1,15 +1,7 @@
-use anyhow::Result;
-use flexi_logger::{writers::FileLogWriter, Age, Cleanup, Criterion, Naming};
+use tracing_appender::{non_blocking, rolling::daily};
 
-pub fn crate_logger<P: Into<std::path::PathBuf>>(path: P) -> Result<FileLogWriter> {
-    let logger = FileLogWriter::builder()
-        .directory(path)
-        .rotate(
-            Criterion::Age(Age::Day),
-            Naming::Timestamps,
-            Cleanup::KeepLogFiles(30),
-        )
-        .print_message()
-        .try_build()?;
-    Ok(logger)
+pub fn start_trace_subscriber<P: AsRef<std::path::Path>>(path: P) {
+    let file_appender = daily(path, "MBOT");
+    let (non_blocking, _guard) = non_blocking(file_appender);
+    tracing_subscriber::fmt().with_writer(non_blocking).init();
 }

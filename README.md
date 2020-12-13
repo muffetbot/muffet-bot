@@ -100,3 +100,8 @@ pub enum Color {
     Teal = 0x1ABC9C,
 }
 ```
+<br>
+
+##### Will not compile without custom impl of Debug for serenity's Context struct:
+> TypeMap does not derive Debug trait
+> Required by tracing crate

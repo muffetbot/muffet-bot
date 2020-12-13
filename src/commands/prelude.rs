@@ -1,12 +1,12 @@
 pub use crate::utils::config::CommandResponse;
 pub use crate::utils::scraper::SteelCutter;
-pub use log::*;
 pub use serenity::prelude::*;
 use serenity::utils::{content_safe, ContentSafeOptions};
 pub use serenity::{
     framework::standard::{macros::command, Args, CommandResult},
     model::channel::Message,
 };
+pub use tracing::{info, instrument};
 
 pub async fn has_permissions(msg: &Message) -> bool {
     msg.author == *crate::OWNER.lock().await
@@ -20,7 +20,7 @@ pub async fn announce<S>(
     response_type: &CommandResponse,
 ) -> CommandResult
 where
-    S: std::fmt::Display + AsRef<str>,
+    S: std::fmt::Display + std::fmt::Debug + AsRef<str>,
 {
     use CommandResponse::*;
     match response_type {
@@ -33,32 +33,31 @@ where
 }
 
 /// announces given message to entire thread. `announcement` can be any type that implements as_ref for string slice
+#[instrument]
 async fn announce_to_channel<S>(ctx: &Context, msg: &Message, announcement: S) -> CommandResult
 where
-    S: AsRef<str>,
+    S: AsRef<str> + std::fmt::Debug,
 {
     let content = content_safe(&ctx.cache, announcement, &ContentSafeOptions::default()).await;
 
-    match msg.channel_id.say(&ctx.http, &content).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("Announce error: {:#?}", e);
-            Err(Box::new(e))
-        }
+    if let Err(e) = msg.channel_id.say(&ctx.http, &content).await {
+        info!("Announce error: {:#?}", e);
     }
+    Ok(())
 }
 
 /// bot sends dm to admin to avoid leaking info to channel
+#[instrument]
 async fn direct_message<S>(ctx: &Context, msg: &Message, dm: S, to_owner: bool) -> CommandResult
 where
-    S: std::fmt::Display,
+    S: std::fmt::Display + std::fmt::Debug,
 {
     if to_owner && !has_permissions(msg).await {
         return Ok(());
     }
 
     let color = &crate::CONFIG.lock().await.help_color;
-    match msg
+    if let Err(e) = msg
         .author
         .direct_message(ctx, |m| {
             m.embed(|embed| {
@@ -70,24 +69,19 @@ where
         })
         .await
     {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("DM to Admin failed: {}", e.to_string());
-            Err(Box::new(e))
-        }
+        info!("DM to Admin failed: {}", e.to_string());
     }
+    Ok(())
 }
 
 /// bot replies to message sender in channel
+#[instrument]
 async fn reply_to_sender<S>(ctx: &Context, msg: &Message, reply: S) -> CommandResult
 where
-    S: std::fmt::Display,
+    S: std::fmt::Display + std::fmt::Debug,
 {
-    match msg.reply(ctx, reply).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("Error replying to {}: {}", &msg.author, e.to_string());
-            Err(Box::new(e))
-        }
+    if let Err(e) = msg.reply(ctx, reply).await {
+        info!("Error replying to {}: {}", &msg.author, e.to_string());
     }
+    Ok(())
 }

@@ -1,12 +1,13 @@
-use log::*;
 use once_cell::sync::OnceCell;
 use smartstring::{Compact, SmartString};
+use tracing::{info, instrument};
 
 /// required header for a valid http request.
 /// update if you want, prolly won't matter
 const DUMMY_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36/8mqQhSuL-09";
 
 /// all fields for this struct are private, but its methods are public
+#[derive(Debug)]
 pub struct SteelCutter {
     page: Links,
     node_tree: OnceCell<NodeTree>,
@@ -31,6 +32,7 @@ impl SteelCutter {
     ///     // this is a separate scope
     ///     cutter.fetch()...
     /// }
+    #[instrument]
     pub async fn fetch(&mut self) -> anyhow::Result<()> {
         let client = reqwest::ClientBuilder::new()
             .user_agent(DUMMY_USER_AGENT)
@@ -42,13 +44,13 @@ impl SteelCutter {
         let parser = match easy_scraper::Pattern::new(self.page.pattern().await) {
             Ok(pattern) => pattern,
             Err(e) => {
-                error!("easy_scraper error: {:?}", e);
+                info!("easy_scraper error: {:?}", e);
                 anyhow::bail!("easy_scraper pattern failed to unwrap")
             }
         };
         let html_nodes = parser.matches(&body);
         if let Err(e) = self.node_tree.set(html_nodes) {
-            error!("unable to set SteelCutter.node_tree value: {:?}", e);
+            info!("unable to set SteelCutter.node_tree value: {:?}", e);
             anyhow::bail!("unable to hydrate once_cell with html_nodes")
         }
         Ok(())
@@ -87,6 +89,7 @@ impl SteelCutter {
     }
 }
 
+#[derive(Debug)]
 pub enum Links {
     About,
     Goals,
