@@ -30,7 +30,7 @@ impl std::fmt::Display for HotReloadError {
             EnvMissing => "MUFFETBOT_CONFIG env var not found",
             FetchFailed => "Unable to find config file",
             ImproperFormat => {
-                "Improper formatting for command. Use the `help` command for more info."
+                "Improper formatting for command. Use `help <command name>` for more info."
             }
             OperationFailed => "Unable to complete operation",
             WriteFailed => "Unable to write new config to file",
@@ -86,10 +86,10 @@ async fn try_hot_reload(mut args: Args, discrim: AllowedReloads) -> Result<Strin
             }
         }
         AllowedReloads::Help => {
-            success_msg += match args.remains() {
+            match args.remains() {
                 Some(help) => {
                     config.set_help(help.to_string()).await;
-                    "Help message successfully changed!"
+                    success_msg += "Help message successfully changed!";
                 }
                 None => return Err(ImproperFormat),
             };
@@ -106,7 +106,7 @@ async fn try_hot_reload(mut args: Args, discrim: AllowedReloads) -> Result<Strin
                         if config.push_command(&cmd, target).await.is_err() {
                             return Err(OperationFailed);
                         } else {
-                            success_msg = format!("added the <{}> command!", cmd);
+                            success_msg = format!("added the `{}` command!", cmd);
                         }
                     }
                     None => return Err(ImproperFormat),
@@ -115,7 +115,7 @@ async fn try_hot_reload(mut args: Args, discrim: AllowedReloads) -> Result<Strin
                     if config.pop_command(cmd.as_ref()).await.is_err() {
                         return Err(OperationFailed);
                     } else {
-                        success_msg = format!("removed the <{}> command!", cmd);
+                        success_msg = format!("removed the `{}` command!", cmd);
                     }
                 }
             }
@@ -192,7 +192,7 @@ async fn set_help(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 #[command]
 #[owners_only]
 #[description = "change the highlight color for the bot's responses"]
-#[usage = "`!color <new color>`"]
+#[usage = "`!color <new color>` or `!color` to see available options"]
 #[example = "`!color rohrkatze-blue`"]
 async fn color(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let result = match try_hot_reload(args, AllowedReloads::Color).await {

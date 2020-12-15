@@ -121,10 +121,28 @@ impl CommandData {
 
 #[derive(Debug, Default)]
 pub struct ConfigData {
-    pub commands: Vec<CommandData>,
-    pub help_color: Color,
-    pub help_message: String,
-    pub site_url: String,
+    commands: Vec<CommandData>,
+    help_color: Color,
+    help_message: String,
+    site_url: String,
+}
+
+impl ConfigData {
+    pub fn get_help_color(&self) -> &Color {
+        &self.help_color
+    }
+
+    pub fn get_help_message(&self) -> &str {
+        &self.help_message
+    }
+
+    pub fn get_commands(&self) -> &Vec<CommandData> {
+        &self.commands
+    }
+
+    pub fn get_site_url(&self) -> &str {
+        &self.site_url
+    }
 }
 
 impl Config {

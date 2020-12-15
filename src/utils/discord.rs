@@ -3,10 +3,9 @@ use serenity::{
     client::bridge::gateway::ShardManager,
     framework::standard::{
         macros::{help, hook},
-        Args, CommandGroup, CommandResult, HelpOptions,
+        CommandGroup, HelpOptions,
     },
-    model::{channel::Message, id::UserId},
-    prelude::*,
+    model::id::UserId,
 };
 
 pub struct ShardManagerContainer;
@@ -43,7 +42,7 @@ pub async fn muffet_help(
             commands.push((*cmd).into());
         }
     }
-    for cmd in &borrowed_config.commands {
+    for cmd in borrowed_config.get_commands() {
         if cmd.restricted() && owners.get(&msg.author.id).is_none() {
             continue;
         }
@@ -117,8 +116,8 @@ async fn echo_group_cmds(
     msg.channel_id
         .send_message(&ctx, |m| {
             m.embed(|embed| {
-                embed.colour(config_data.help_color.clone());
-                embed.description(&config_data.help_message);
+                embed.colour(config_data.get_help_color().clone());
+                embed.description(config_data.get_help_message());
                 embed.field("Muffetbot", flatten_cmds(cmds), true);
                 embed
             });
@@ -145,9 +144,7 @@ async fn single_help(ctx: &Context, msg: &Message, cmd_data: &CommandData) -> Co
 #[hook]
 #[instrument]
 pub async fn unknown_command(ctx: &Context, msg: &Message, unknown_command_name: &str) {
-    let config_commands = &crate::CONFIG.lock().await.commands;
-
-    for cmd in config_commands {
+    for cmd in crate::CONFIG.lock().await.get_commands() {
         if unknown_command_name == cmd.get_trigger() {
             if let CommandResponse::Embed = cmd.get_response_type() {
                 if let Err(e) = embedded_cmd(ctx, msg, cmd).await {

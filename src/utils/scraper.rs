@@ -128,13 +128,12 @@ impl Links {
     pub async fn display(&self) -> String {
         use Links::*;
 
-        let mut base_url = (&crate::CONFIG.lock().await).site_url.to_string();
-        match self {
-            About => base_url.push_str("/about"),
-            Goals => base_url.push_str("/goals"),
-            Shop => base_url.push_str("/shop"),
-        }
-
+        let base_url = crate::CONFIG.lock().await.get_site_url().to_string();
         base_url
+            + match self {
+                About => "/about",
+                Goals => "/goals",
+                Shop => "/shop",
+            }
     }
 }

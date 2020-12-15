@@ -1,10 +1,9 @@
-pub use crate::utils::config::CommandResponse;
-pub use crate::utils::scraper::SteelCutter;
-pub use serenity::prelude::*;
+pub use crate::utils::{config::CommandResponse, scraper::SteelCutter};
 use serenity::utils::{content_safe, ContentSafeOptions};
 pub use serenity::{
     framework::standard::{macros::command, Args, CommandResult},
     model::channel::Message,
+    prelude::*,
 };
 pub use tracing::{info, instrument};
 
@@ -56,12 +55,12 @@ where
         return Ok(());
     }
 
-    let color = &crate::CONFIG.lock().await.help_color;
+    let color = crate::CONFIG.lock().await.get_help_color().clone();
     if let Err(e) = msg
         .author
         .direct_message(ctx, |m| {
             m.embed(|embed| {
-                embed.color(color.clone());
+                embed.color(color);
                 embed.field("hi!", dm, true);
                 embed
             });

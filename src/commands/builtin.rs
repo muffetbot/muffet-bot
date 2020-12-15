@@ -8,7 +8,7 @@ async fn shop(ctx: &Context, msg: &Message) -> CommandResult {
     if cutter.fetch().await.is_ok() {
         if let Some(name_nodes) = cutter.get_nodes_vec("item_name") {
             if let Some(url_nodes) = cutter.get_nodes_vec("shop_url") {
-                let site_url = &crate::CONFIG.lock().await.site_url;
+                let site_url = crate::CONFIG.lock().await.get_site_url().to_string();
 
                 let zipped = name_nodes.iter().zip(url_nodes).fold(
                     String::new(),
