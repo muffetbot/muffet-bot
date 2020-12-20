@@ -1,3 +1,3 @@
 pub mod config;
 pub mod discord;
-pub mod scraper;
+pub mod prelude;

@@ -1,11 +1,11 @@
 /// SEE https://docs.rs/serenity/0.9.2/serenity/ for documentation on Discord API for Rust
 /// SEE https://github.com/serenity-rs/serenity/tree/current/examples for examples
-mod commands;
+mod admin;
+mod mods;
 mod utils;
 
-pub(crate) use commands::prelude;
 use utils::discord::*;
-pub(crate) use utils::scraper::Links;
+pub(crate) use utils::prelude;
 
 use crate::prelude::*;
 use serenity::{framework::standard::StandardFramework, http::Http, model::user::User};
@@ -20,11 +20,27 @@ static CONFIG: Lazy<Mutex<ConfigData>> = Lazy::new(|| Mutex::default());
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // try getting $MUFFETBOT_CONFIG env or trigger initial setup if not present
-    let config_path = match env::var("MUFFETBOT_CONFIG") {
+    let mut config_path = match env::var("MUFFETBOT_CONFIG") {
         Ok(path) => path,
-        _ => utils::config::init()
-            .expect("Please set MUFFETBOT_CONFIG env. Unable to find config file."),
+        _ => match utils::config::init() {
+            Ok(mb_env) => mb_env,
+            Err(e) => {
+                eprintln!("{}", e.as_ref());
+                anyhow::bail!("init error")
+            }
+        },
     };
+
+    if !std::path::Path::new(&config_path).exists() {
+        eprintln!("$MUFFETBOT_CONFIG points to a non-existing path");
+        config_path = match utils::config::init() {
+            Ok(mb_env) => mb_env,
+            Err(e) => {
+                eprintln!("{}", e.as_ref());
+                anyhow::bail!("init error")
+            }
+        }
+    }
 
     // getting config data from file at $MUFFETBOT_CONFIG path
     let config = get_conf(&config_path).await?;
@@ -70,8 +86,8 @@ async fn main() -> anyhow::Result<()> {
         })
         .unrecognised_command(unknown_command)
         .help(&MUFFET_HELP)
-        .group(&commands::ADMIN_GROUP)
-        .group(&commands::KAWAII_GROUP);
+        .group(&admin::ADMIN_GROUP)
+        .group(&mods::commands::CUSTOMCOMMANDS_GROUP);
 
     // setting up client to subscribe to Discord events
     let mut client = serenity::client::Client::builder(&token)

@@ -341,12 +341,46 @@ fn query_stdin(question: &str, sanitize: bool) -> Option<String> {
     }
 }
 
-// pub enum InitError {
-//
-// }
+#[derive(Debug)]
+pub enum InitError {
+    AncestorMissing,
+    EnvUnset,
+    HomeNotFound,
+    NoDiscordToken,
+    ReadError,
+    TomlSerializationError,
+    UnixProfileMissing,
+    UserIsRoot,
+    WriteError,
+}
 
+impl AsRef<str> for InitError {
+    fn as_ref(&self) -> &str {
+        match self {
+            AncestorMissing => "Unable to create all dirs for given path.",
+            EnvUnset => "Please set $MUFFETBOT_CONFIG manually",
+            HomeNotFound => "System home not found. Try setting $HOME env.",
+            NoDiscordToken => "Discord token is required!",
+            ReadError => "Unable to read '~/.profile'",
+            TomlSerializationError => "Unable to serialize new config into toml.",
+            UnixProfileMissing => "'~/.profile' not found!",
+            UserIsRoot => "For security, this bot should not be installed as root!",
+            WriteError => "Unable to write new config.",
+        }
+    }
+}
+
+fn is_root() -> bool {
+    if let Some(user) = std::env::var_os("USER") {
+        user == "root"
+    } else {
+        false
+    }
+}
+
+use InitError::*;
 /// writes MUFFETBOT_CONFIG to ~/.profile
-fn set_muffetbot_env<S>(config_path: S, unix_home: &PathBuf) -> Result<()>
+fn set_muffetbot_env<S>(config_path: S, unix_home: &PathBuf) -> Result<(), InitError>
 where
     S: std::fmt::Display + AsRef<std::ffi::OsStr>,
 {
@@ -355,9 +389,15 @@ where
     let mut unix_profile = unix_home.clone();
     unix_profile.push(".profile");
     if !unix_profile.exists() || !unix_profile.is_file() {
-        std::fs::File::create(&unix_profile)?;
+        if std::fs::File::create(&unix_profile).is_err() {
+            return Err(UnixProfileMissing);
+        }
     }
-    let profile_str = read_to_string(&unix_profile)?;
+    let profile_str = if let Ok(profile) = read_to_string(&unix_profile) {
+        profile
+    } else {
+        return Err(ReadError);
+    };
 
     let mut profile_lines = profile_str.split("\n").collect::<Vec<&str>>();
 
@@ -365,27 +405,41 @@ where
     let mut profile_string = profile_lines.join("\n");
     profile_string.push_str(&format!("\nexport MUFFETBOT_CONFIG=\"{}\"", config_path));
 
-    std::fs::write(unix_profile, profile_string)
-        .expect("Write failed. Please set $MUFFETBOT_CONFIG manually");
-    Ok(())
+    if std::fs::write(unix_profile, profile_string).is_err() {
+        Err(EnvUnset)
+    } else {
+        Ok(())
+    }
 }
 
 use std::fs::create_dir_all;
 /// Initial configuration walkthrough
-pub fn init() -> Result<String> {
-    let unix_home = home::home_dir().expect("Unable to locate system home.");
-    let discord_token = query_stdin("Please enter your server discord token", true)
-        .expect("Discord token is required!");
+pub fn init() -> Result<String, InitError> {
+    if is_root() {
+        return Err(UserIsRoot);
+    }
+
+    let unix_home = if let Some(home) = home::home_dir() {
+        home
+    } else {
+        return Err(HomeNotFound);
+    };
+    let discord_token =
+        if let Some(token) = query_stdin("Please enter your server discord token", true) {
+            token
+        } else {
+            return Err(NoDiscordToken);
+        };
 
     let config_path = match query_stdin(
-        "By default the muffetbot config will be stored in ~/.config/muffetbot.toml\n\
+        "By default the muffetbot config will be stored in ~/.config/muffetbot/config.toml\n\
         If you want to choose a different path, please enter it now or leave this empty.",
         true,
     ) {
         Some(query) => PathBuf::from(query),
         None => {
             let mut config_path = unix_home.clone();
-            config_path.push(".config/muffetbot.toml");
+            config_path.push(".config/muffetbot/config.toml");
             config_path
         }
     };
@@ -410,21 +464,20 @@ pub fn init() -> Result<String> {
             log_path
         }
     };
-    create_dir_all(&log_path)?;
+    if create_dir_all(&log_path).is_err() {
+        return Err(AncestorMissing);
+    }
 
-    let prefix = match query_stdin(
+    let command_prefix = query_stdin(
         "Do you wish to override the command prefix?\n\
         Enter your preference or leave the default value `!`",
         true,
-    ) {
-        Some(pre) => pre,
-        None => "!".to_owned(),
-    };
+    );
 
     let new_config = Config {
         help_color: Some(Color::BlitzBlue),
         commands: None,
-        command_prefix: Some(prefix),
+        command_prefix,
         discord_token,
         help_message,
         log_path: log_path.to_string_lossy().to_string(),
@@ -432,15 +485,28 @@ pub fn init() -> Result<String> {
     };
 
     let conf_path = Path::new(&config_path);
-    if let Some(parent) = conf_path.parent() {
-        if !parent.exists() {
-            create_dir_all(parent)?;
+    if let Some(parent_dir) = conf_path.parent() {
+        if !parent_dir.exists() {
+            if create_dir_all(parent_dir).is_err() {
+                return Err(AncestorMissing);
+            }
         }
     }
 
-    std::fs::write(&config_path, toml::to_string(&new_config)?)?;
+    match toml::to_string(&new_config) {
+        Ok(conf) => {
+            if std::fs::write(&config_path, conf).is_err() {
+                return Err(WriteError);
+            }
+        }
+        Err(_) => {
+            return Err(TomlSerializationError);
+        }
+    }
     let config_path = config_path.to_string_lossy().to_string();
     set_muffetbot_env(&config_path, &unix_home)?;
+
+    println!("All set! Starting muffetbot now!\nUse ctrl+c to exit.");
     Ok(config_path)
 }
 

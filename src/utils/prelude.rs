@@ -1,4 +1,4 @@
-pub use crate::utils::{config::CommandResponse, scraper::SteelCutter};
+pub use crate::utils::config::CommandResponse;
 use serenity::utils::{content_safe, ContentSafeOptions};
 pub use serenity::{
     framework::standard::{macros::command, Args, CommandResult},

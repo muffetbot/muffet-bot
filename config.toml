@@ -1,0 +1,55 @@
+help_color = "rohrkatze-blue"
+discord_token = "NzY2NDIwMTU5Mzk2NzA4NDQz.X4jGZQ.zsCZiWM3TCffw_xKJY-NJMTtw9M"
+log_path = "/home/hal9000/.local/share/muffetbot-logs"
+help_message = " This is my brand new help command!"
+command_prefix = "!"
+site_url = "https://www.steelcutkawaii.com"
+
+[[command]]
+name = "donate"
+color = "dark-gold"
+help = "Multiple ways to support me!"
+path = "/donate"
+response_type = "embed"
+
+[[command]]
+name = "email"
+color = "fooyoo"
+help = "For when you need to send me long messages, or just wanna talk."
+response_type = "embed"
+target = "xxspidderxx@gmail.com"
+
+[[command]]
+name = "patreon"
+color = "rosewater"
+target = "https://www.patreon.com/LittleMissClub"
+
+[[command]]
+name = "pobox"
+color = "purple"
+response_type = "embed"
+target = "Miss Muffet\nPO Box 151858\nAustin, TX 78715\n"
+
+[[command]]
+name = "stream"
+color = "gold"
+response_type = "embed"
+target = "https://www.chaturbate.com/xx_spidder_xx"
+
+[[command]]
+name = "twitter"
+color = "blitz-blue"
+target = "https://twitter.com/LittleMissMuf18"
+
+[[command]]
+name = "venmo"
+color = "rohrkatze-blue"
+response_type = "embed"
+target = "https://venmo.com/LilMissMuffet"
+
+[[command]]
+name = "youtube"
+color = "red"
+help = "Comment, share, like, and subscribe!"
+response_type = "reply"
+target = "https://www.youtube.com/c/XxSpidderxX"
