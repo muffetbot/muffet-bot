@@ -1,4 +1,4 @@
 /target
 *.lock
 *.html
-muffetbot.toml
+config.toml
